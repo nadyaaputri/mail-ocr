@@ -1,0 +1,197 @@
+/*
+ * CUSTOM SIDEBAR STYLING - by Gemini (v6 - Final)
+ * Perbaikan: Menghilangkan panah default tema & mempertebal chevron.
+*/
+
+/*
+    PENGATURAN WARNA BACKGROUND WEBSITE
+*/
+.layout-page {
+    background-color: #ffffff !important; /* Ganti #f0f4f9 dengan warna pilihan Anda */
+}
+
+.layout-menu {
+    box-shadow: none !important;
+    border-right: none !important;
+}
+
+/* UBAH: Hapus panah default dari tema Sneat agar tidak tumpang tindih */
+.modern-sidebar .menu-item .menu-link.menu-toggle::before {
+    content: '' !important;
+    display: none !important;
+}
+
+.modern-sidebar {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    bottom: 20px;
+    width: 100px;
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgba(105, 108, 255, 0.18);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 0;
+    transition: width 0.3s ease-in-out;
+    z-index: 1050;
+}
+
+.modern-sidebar.expanded {
+    width: 280px;
+}
+
+.modern-sidebar .sidebar-top {
+    padding: 0 33px;
+    margin-bottom: 20px;
+}
+
+.modern-sidebar .app-brand-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.modern-sidebar .app-brand-logo img {
+    height: 34px;
+    width: auto;
+}
+
+.modern-sidebar .menu-text {
+    margin-left: 12px;
+    font-weight: 600;
+    color: #566a7f;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    white-space: nowrap;
+}
+
+.modern-sidebar.expanded .menu-text {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0.1s;
+}
+
+.modern-sidebar .sidebar-menu {
+    list-style: none;
+    padding: 0 25px;
+    margin: 0;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.modern-sidebar .menu-item {
+    margin-bottom: 8px;
+}
+
+.modern-sidebar .menu-link {
+    display: flex;
+    align-items: center;
+    padding: 14px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #697a8d;
+    transition: background-color 0.2s, color 0.2s;
+    overflow: hidden;
+    position: relative;
+}
+
+.modern-sidebar.expanded .menu-link {
+    padding: 14px 15px;
+}
+
+.modern-sidebar .menu-link:hover {
+    background-color: #eef1f4;
+    color: #566a7f;
+}
+
+.modern-sidebar .menu-item.active > .menu-link {
+    background-color: #696cff;
+    color: #fff;
+}
+
+.modern-sidebar .menu-item.active > .menu-link .menu-text,
+.modern-sidebar .menu-item.active > .menu-link i {
+    color: #fff;
+}
+
+.modern-sidebar .menu-link i {
+    font-size: 24px;
+    font-style: oblique;
+    min-width: 24px;
+    text-align: center;
+}
+
+.modern-sidebar.expanded .menu-toggle::after {
+    opacity: 100%;
+    visibility: visible;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.modern-sidebar.expanded .menu-item.open > .menu-toggle::after {
+    transform: rotate(90deg);
+}
+
+/* Styling untuk container sub-menu */
+.menu-sub {
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0 0;
+    background-color: rgba(238, 241, 244, 0.5);
+    border-radius: 8px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+}
+
+.modern-sidebar.expanded .menu-item.open > .menu-sub {
+    max-height: 200px;
+    padding: 8px;
+}
+
+.menu-sub .menu-item {
+    margin-bottom: 2px;
+}
+.menu-sub .menu-link {
+    padding: 10px 15px 10px 20px;
+    font-size: 0.9rem;
+}
+
+.menu-sub .menu-link:hover {
+    background-color: rgba(105, 108, 255, 0.1);
+}
+
+.menu-sub .menu-item.active > .menu-link {
+    background-color: transparent !important;
+    color: #696cff !important;
+    font-weight: bold;
+}
+
+.menu-sub .menu-item.active > .menu-link .menu-text {
+    color: #696cff !important;
+}
+
+.sidebar-bottom {
+    padding: 0 25px;
+}
+
+.sidebar-toggle i {
+    transition: transform 0.3s ease-in-out;
+}
+
+.modern-sidebar.expanded .sidebar-toggle i {
+    transform: rotate(180deg);
+}
+
+.layout-page {
+    padding-left: 130px;
+    transition: padding-left 0.3s ease-in-out;
+}
+
+.modern-sidebar.expanded ~ .layout-page {
+    padding-left: 310px;
+}

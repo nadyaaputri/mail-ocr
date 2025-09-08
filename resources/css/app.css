@@ -1,0 +1,51 @@
+/*
+ * CUSTOM SIDEBAR STYLE - by Gemini
+ * Style untuk memberikan tampilan modern pada sidebar Sneat.
+*/
+
+/* Memberi sedikit ruang di atas dan bawah menu */
+.layout-menu .menu-inner {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+/* Style untuk menu item agar lebih minimalis */
+.layout-menu .menu-item .menu-link {
+    transition: all 0.2s ease-in-out;
+    border-radius: 0.5rem; /* Membuat sudut lebih tumpul */
+}
+
+/* Indikator aktif modern (garis vertikal di kiri) */
+.layout-menu .menu-item.active > .menu-link {
+    box-shadow: -4px 0 0 0 var(--bs-primary) inset; /* Garis di kiri */
+    background-color: var(--bs-primary-light) !important; /* Warna latar sedikit berbeda */
+    color: var(--bs-primary) !important;
+}
+
+/* Pastikan warna ikon juga berubah saat aktif */
+.layout-menu .menu-item.active > .menu-link i {
+    color: var(--bs-primary) !important;
+}
+
+/* Menghilangkan background gradien default pada menu-sub yang aktif */
+.layout-menu .menu-sub .menu-item.active > .menu-link {
+    background: transparent !important;
+}
+
+.layout-menu .menu-sub .menu-item.active > .menu-link:not(.menu-toggle) {
+    color: var(--bs-primary) !important;
+}
+
+
+/* Membuat header menu lebih soft dan tidak terlalu mencolok */
+.layout-menu .menu-header {
+    padding: 1rem 1.625rem 0.5rem;
+    color: #a1acb8;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+/* Hover effect yang lebih smooth */
+.layout-menu .menu-item:not(.active) .menu-link:hover {
+    background-color: rgba(105, 108, 255, 0.04); /* Warna hover yang sangat soft */
+}
