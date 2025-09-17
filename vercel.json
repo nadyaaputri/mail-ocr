@@ -1,0 +1,33 @@
+{
+    "version": 2,
+    "framework": null,
+    "builds": [
+        {
+            "src": "/public/index.php",
+            "use": "vercel-php@0.6.0"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(css|js|images|assets)/(.*)",
+            "dest": "/public/$1/$2"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/public/index.php"
+        }
+    ],
+    "env": {
+        "APP_ENV": "production",
+        "APP_DEBUG": "false",
+        "APP_URL": "https://nama-proyek-anda.vercel.app",
+        "APP_KEY": "@app-key",
+        "APP_STORAGE_PATH": "/tmp/storage",
+        "VIEW_COMPILED_PATH": "/tmp/storage/framework/views",
+        "SESSION_DRIVER": "cookie",
+        "CACHE_DRIVER": "array",
+        "LOG_CHANNEL": "stderr",
+        "DB_CONNECTION": "pgsql",
+        "DATABASE_URL": "@database-url"
+    }
+}

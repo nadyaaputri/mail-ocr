@@ -5,3 +5,4 @@ php-fpm &
 
 # Jalankan Nginx di foreground
 nginx -g 'daemon off;'
+
