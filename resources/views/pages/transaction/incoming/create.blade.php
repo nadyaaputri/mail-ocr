@@ -5,7 +5,7 @@
         :values="[__('menu.transaction.menu'), __('menu.transaction.incoming_letter'), __('menu.general.create')]">
     </x-breadcrumb>
 
-    {{-- KARTU BARU UNTUK FITUR OCR --}}
+    {{-- KARTU FITUR OCR --}}
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="card-title mb-0">Otomatisasi dengan OCR</h5>
@@ -13,14 +13,9 @@
         <div class="card-body">
             <div class="row">
                 <div class="col-md-8">
-                    <label for="ocr_file" class="form-label">Unggah Dokumen (Gambar)</label>
-                    <div class="input-group">
-                        <input class="form-control" type="file" id="ocr_file" name="ocr_file" accept="image/*">
-                        <button class="btn btn-primary" type="button" id="scan-ocr-btn">
-                            <i class="bx bx-scan me-1"></i> Scan Dokumen
-                        </button>
-                    </div>
-                    <div class="form-text">Unggah file gambar (JPG, PNG) dari surat yang sudah dipindai untuk mengisi formulir secara otomatis.</div>
+                    <label for="ocr_file" class="form-label">Unggah Dokumen & Pindai Otomatis</label>
+                    <input class="form-control" type="file" id="ocr_file" name="ocr_file" accept="image/*">
+                    <div class="form-text">Pilih file gambar (JPG, PNG). Formulir di bawah akan terisi secara otomatis setelah file dipilih.</div>
                 </div>
                 {{-- Area untuk menampilkan status loading --}}
                 <div class="col-md-4 d-flex align-items-center justify-content-center d-none" id="ocr-loading">
@@ -33,7 +28,7 @@
         </div>
     </div>
 
-    {{-- FORMULIR PEMBUATAN SURAT --}}
+    {{-- FORMULIR PEMBUATAN SURAT (SUDAH LENGKAP) --}}
     <div class="card">
         <div class="card-header">
             <h5 class="card-title mb-0">Formulir Surat Masuk</h5>
@@ -43,39 +38,86 @@
                 @csrf
                 <input type="hidden" name="type" value="incoming">
 
-                {{-- Kolom-kolom formulir --}}
-                <div class="mb-3">
-                    <label for="reference_number" class="form-label">Nomor Referensi</label>
-                    <input type="text" class="form-control @error('reference_number') is-invalid @enderror" id="reference_number" name="reference_number" value="{{ old('reference_number') }}">
-                    @error('reference_number')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="mb-3">
-                    <label for="from" class="form-label">Pengirim</label>
-                    <input type="text" class="form-control @error('from') is-invalid @enderror" id="from" name="from" value="{{ old('from') }}">
-                    @error('from')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="mb-3">
-                    <label for="letter_date" class="form-label">Tanggal Surat</label>
-                    <input type="date" class="form-control @error('letter_date') is-invalid @enderror" id="letter_date" name="letter_date" value="{{ old('letter_date') }}">
-                    @error('letter_date')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-                {{-- Kolom lainnya tetap sama --}}
+                <div class="row">
+                    {{-- Kolom Kiri --}}
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="reference_number" class="form-label">Nomor Referensi</label>
+                            <input type="text" class="form-control @error('reference_number') is-invalid @enderror" id="reference_number" name="reference_number" value="{{ old('reference_number') }}">
+                            @error('reference_number')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-3">
+                            <label for="agenda_number" class="form-label">Nomor Agenda</label>
+                            <input type="text" class="form-control @error('agenda_number') is-invalid @enderror" id="agenda_number" name="agenda_number" value="{{ old('agenda_number') }}">
+                            @error('agenda_number')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-3">
+                            <label for="from" class="form-label">Pengirim</label>
+                            <input type="text" class="form-control @error('from') is-invalid @enderror" id="from" name="from" value="{{ old('from') }}">
+                            @error('from')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-3">
+                            <label for="letter_date" class="form-label">Tanggal Surat</label>
+                            <input type="date" class="form-control @error('letter_date') is-invalid @enderror" id="letter_date" name="letter_date" value="{{ old('letter_date') }}">
+                            @error('letter_date')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
 
+                    {{-- Kolom Kanan --}}
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="received_date" class="form-label">Tanggal Diterima</label>
+                            <input type="date" class="form-control @error('received_date') is-invalid @enderror" id="received_date" name="received_date" value="{{ old('received_date') }}">
+                            @error('received_date')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-3">
+                            <label for="classification_code" class="form-label">Kode Klasifikasi</label>
+                            <select class="form-select @error('classification_code') is-invalid @enderror" id="classification_code" name="classification_code">
+                                <option selected disabled>Pilih klasifikasi...</option>
+                                @foreach($classifications as $classification)
+                                    <option value="{{ $classification->code }}" {{ old('classification_code') == $classification->code ? 'selected' : '' }}>{{ $classification->code }} - {{ $classification->type }}</option>
+                                @endforeach
+                            </select>
+                            @error('classification_code')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-3">
+                            <label for="attachments" class="form-label">Lampiran</label>
+                            <input class="form-control @error('attachments') is-invalid @enderror" type="file" id="attachments" name="attachments[]" multiple>
+                            @error('attachments')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Kolom Bawah (Full Width) --}}
                 <div class="mb-3">
                     <label for="description" class="form-label">Deskripsi/Perihal</label>
-                    <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description">{{ old('description') }}</textarea>
+                    <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description" rows="3">{{ old('description') }}</textarea>
                     @error('description')
                     <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
+                <div class="mb-3">
+                    <label for="note" class="form-label">Catatan</label>
+                    <textarea class="form-control @error('note') is-invalid @enderror" id="note" name="note" rows="3">{{ old('note') }}</textarea>
+                    @error('note')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
 
-                {{-- Tombol Submit --}}
                 <button type="submit" class="btn btn-primary">{{ __('menu.general.save') }}</button>
             </form>
         </div>
@@ -84,26 +126,22 @@
 
 @push('script')
     <script>
+        // Skrip OCR tidak berubah, karena sudah menargetkan field yang benar.
         document.addEventListener('DOMContentLoaded', function() {
             const ocrFile = document.getElementById('ocr_file');
-            const scanBtn = document.getElementById('scan-ocr-btn');
             const loadingSpinner = document.getElementById('ocr-loading');
 
-            scanBtn.addEventListener('click', function() {
+            ocrFile.addEventListener('change', function() {
                 if (ocrFile.files.length === 0) {
-                    alert('Silakan pilih file gambar terlebih dahulu.');
                     return;
                 }
 
-                // Tampilkan loading
                 loadingSpinner.classList.remove('d-none');
-                scanBtn.disabled = true;
 
                 const formData = new FormData();
                 formData.append('ocr_file', ocrFile.files[0]);
-                formData.append('_token', '{{ csrf_token() }}'); // Tambahkan CSRF token
+                formData.append('_token', '{{ csrf_token() }}');
 
-                // Kirim request AJAX ke OcrController
                 fetch('{{ route("ocr.scan") }}', {
                     method: 'POST',
                     body: formData,
@@ -118,7 +156,6 @@
                         if (data.error) {
                             alert('Error: ' + data.error);
                         } else {
-                            // Panggil fungsi untuk mengisi form dengan teks hasil OCR
                             populateForm(data.text);
                         }
                     })
@@ -127,49 +164,42 @@
                         alert('Gagal melakukan OCR. Silakan cek konsol untuk detail.');
                     })
                     .finally(() => {
-                        // Sembunyikan loading
                         loadingSpinner.classList.add('d-none');
-                        scanBtn.disabled = false;
                     });
             });
 
             function populateForm(text) {
-                // --- LOGIKA SEDERHANA UNTUK EKSTRAKSI DATA ---
-                // Anda bisa membuat logika ini jauh lebih canggih dengan Regex
                 const lines = text.split('\n');
-                let dataExtracted = {
-                    nomor: '',
-                    tanggal: '',
-                    dari: ''
-                };
+                let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
 
-                lines.forEach(line => {
+                lines.forEach((line, index) => {
                     // Ekstraksi Nomor Surat (mencari kata "Nomor:")
-                    if (line.toLowerCase().includes('nomor:')) {
+                    if (line.toLowerCase().includes('nomor') && line.includes(':')) {
                         dataExtracted.nomor = line.split(':')[1]?.trim() || '';
                     }
 
-                    // Ekstraksi Tanggal Surat (mencari format tanggal)
-                    // Contoh Regex sederhana untuk format DD MMMM YYYY
+                    // Ekstraksi Tanggal Surat
                     const dateRegex = /(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
                     const dateMatch = line.match(dateRegex);
                     if (dateMatch) {
-                        // Convert "19 September 2025" ke format "YYYY-MM-DD"
                         dataExtracted.tanggal = convertDate(dateMatch[0]);
                     }
 
-                    // Ekstraksi Pengirim (mencari kata "Yth.")
-                    if (line.toLowerCase().includes('yth.')) {
-                        // Ambil baris setelah "Yth." sebagai pengirim
-                        const nextLineIndex = lines.indexOf(line) + 1;
-                        dataExtracted.dari = lines[nextLineIndex]?.trim() || '';
+                    // Ekstraksi Pengirim (mencari kata "Kepada Yth." atau "Yth.")
+                    if (line.toLowerCase().includes('kepada yth.') || line.toLowerCase().startsWith('yth.')) {
+                        dataExtracted.dari = (lines[index + 1]?.trim() || '') + ' ' + (lines[index + 2]?.trim() || '');
+                    }
+
+                    // Ekstraksi Perihal
+                    if (line.toLowerCase().includes('perihal') && line.includes(':')) {
+                        dataExtracted.perihal = line.split(':')[1]?.trim() || '';
                     }
                 });
 
-                // Isi nilai ke dalam field form
                 if (dataExtracted.nomor) document.getElementById('reference_number').value = dataExtracted.nomor;
                 if (dataExtracted.tanggal) document.getElementById('letter_date').value = dataExtracted.tanggal;
-                if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari;
+                if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari.trim();
+                if (dataExtracted.perihal) document.getElementById('description').value = dataExtracted.perihal;
 
                 alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
             }
@@ -181,12 +211,11 @@
                     const day = parts[0].padStart(2, '0');
                     const month = months[parts[1]];
                     const year = parts[2];
-                    if (day && month && year) {
-                        return `${year}-${month}-${day}`;
-                    }
+                    if (day && month && year) return `${year}-${month}-${day}`;
                 }
                 return '';
             }
         });
     </script>
 @endpush
+
