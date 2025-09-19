@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\IncomingLetterController;
 use App\Http\Controllers\OutgoingLetterController;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\OcrController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,5 +78,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Route untuk memproses data dari form registrasi
     Route::post('/register', [AuthController::class, 'register'])->name('register.perform');
+
+    Route::post('/scan-ocr', [OcrController::class, 'scan'])->name('ocr.scan');
+
+
 
 
