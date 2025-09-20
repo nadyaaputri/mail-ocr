@@ -1,3 +1,4 @@
+[Immersive content redacted for brevity.]
 @extends('layout.main')
 
 @section('content')
@@ -15,20 +16,14 @@
                 <div class="col-md-8">
                     <label class="form-label">Unggah Dokumen & Pindai Otomatis</label>
                     <div>
-                        {{-- Input file asli yang disembunyikan --}}
                         <input class="form-control d-none" type="file" id="ocr_file" name="ocr_file" accept="image/*,application/pdf">
-
-                        {{-- Tombol palsu (label) yang bisa di-styling --}}
                         <label for="ocr_file" class="btn btn-primary">
                             <i class="bx bx-upload me-1"></i> Pilih Dokumen (Gambar/PDF)...
                         </label>
-
-                        {{-- Span untuk menampilkan nama file --}}
                         <span id="ocr-filename" class="ms-2 text-muted">Belum ada file dipilih</span>
                     </div>
-                    <div class="form-text">Pilih file gambar atau PDF. Formulir di bawah akan terisi otomatis.</div>
+                    <div class="form-text">Pilih file gambar atau PDF. Formulir akan terisi otomatis.</div>
                 </div>
-                {{-- Area loading --}}
                 <div class="col-md-4 d-flex align-items-center justify-content-center d-none" id="ocr-loading">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
@@ -137,14 +132,12 @@
 
 @push('script')
     <script>
-        // Skrip OCR & Kustomisasi Tombol File
         document.addEventListener('DOMContentLoaded', function() {
             const ocrFile = document.getElementById('ocr_file');
             const loadingSpinner = document.getElementById('ocr-loading');
             const ocrFilenameSpan = document.getElementById('ocr-filename');
 
             ocrFile.addEventListener('change', function() {
-                // Menampilkan nama file yang dipilih
                 if (ocrFile.files.length > 0) {
                     ocrFilenameSpan.textContent = ocrFile.files[0].name;
                 } else {
@@ -152,7 +145,6 @@
                     return;
                 }
 
-                // Memulai proses OCR
                 loadingSpinner.classList.remove('d-none');
 
                 const formData = new FormData();
@@ -161,6 +153,10 @@
 
                 fetch('{{ route("ocr.scan") }}', {
                     method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest', // Memberitahu Laravel ini adalah request AJAX
+                        'Accept': 'application/json',        // Memberitahu Laravel kita MENGHARAPKAN balasan JSON
+                    },
                     body: formData,
                 })
                     .then(response => {
@@ -228,4 +224,3 @@
         });
     </script>
 @endpush
-

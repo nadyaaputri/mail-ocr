@@ -4,128 +4,69 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Google\Cloud\Vision\V1\ImageAnnotatorClient;
-use Google\Cloud\Storage\StorageClient;
-use Exception;
+use Illuminate\Support\Facades\Http;
+use Imagick;
+use Exception; // Tambahkan ini
 
 class OcrController extends Controller
 {
-    /**
-     * Memproses file yang diunggah untuk OCR dan mengembalikan teks yang terdeteksi.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function scan(Request $request): JsonResponse
     {
-        // #1. Validasi Diperbarui: Sekarang menerima gambar DAN pdf.
         $request->validate([
-            'ocr_file' => 'required|file|mimes:jpeg,png,jpg,pdf|max:10240', // Maksimal 10MB
+            'ocr_file' => 'required|file|mimes:jpeg,png,jpg,pdf|max:5120',
         ]);
 
         try {
-            $credentialsPath = storage_path('app/google-credentials.json');
-            if (!file_exists($credentialsPath)) {
-                return response()->json(['error' => 'File kredensial Google tidak ditemukan.'], 500);
+            $apiKey = 'K85714586788957';
+            if ($apiKey === 'YOUR_API_KEY_HERE') {
+                return response()->json(['error' => 'API Key OCR.space belum diatur.'], 500);
             }
 
             $file = $request->file('ocr_file');
-            $mimeType = $file->getMimeType();
-            $fullText = '';
+            $fileContent = file_get_contents($file->getRealPath());
+            $fileName = $file->getClientOriginalName();
 
-            $imageAnnotator = new ImageAnnotatorClient(['credentials' => $credentialsPath]);
+            if ($file->getMimeType() === 'application/pdf') {
+                $imagick = new Imagick();
+                $imagick->setResolution(300, 300);
+                $imagick->readImage($file->getRealPath() . '[0]');
+                $imagick->setImageFormat('png');
 
-            // #2. Logika Percabangan: Cek apakah file adalah gambar atau PDF.
-            if (in_array($mimeType, ['image/jpeg', 'image/png'])) {
-                // --- PROSES UNTUK GAMBAR ---
-                $imageContent = file_get_contents($file->getRealPath());
-                $response = $imageAnnotator->textDetection($imageContent);
-                $texts = $response->getTextAnnotations();
-                if ($texts) {
-                    $fullText = $texts[0]->getDescription();
-                }
-            } elseif ($mimeType === 'application/pdf') {
-                // --- LOGIKA BARU UNTUK PDF ---
-                $fullText = $this->processPdf($file, $credentialsPath);
+                $fileContent = $imagick->getImageBlob();
+                $fileName = pathinfo($fileName, PATHINFO_FILENAME) . '.png';
+                $imagick->clear();
+                $imagick->destroy();
             }
 
-            return response()->json(['text' => $fullText]);
+            $response = Http::withHeaders(['apikey' => $apiKey])
+                ->attach('file', $fileContent, $fileName)
+                ->post('https://api.ocr.space/parse/image', [
+                    'language' => 'ind',
+                    'isOverlayRequired' => 'false',
+                    'OCREngine' => '1',
+                ]);
+
+            $result = $response->json();
+
+            if (isset($result['ParsedResults'][0]['ParsedText'])) {
+                return response()->json(['text' => $result['ParsedResults'][0]['ParsedText']]);
+            } else {
+                $errorMessage = $result['ErrorMessage'][0] ?? 'Gagal memproses dokumen.';
+                return response()->json(['error' => $errorMessage], 400);
+            }
 
         } catch (Exception $e) {
-            return response()->json(['error' => 'Gagal memproses OCR: ' . $e->getMessage()], 500);
-        } finally {
-            if (isset($imageAnnotator)) {
-                $imageAnnotator->close();
-            }
+            // --- PERUBAHAN DI SINI ---
+            // Kode ini akan memberikan pesan error yang jauh lebih detail
+            $detailedError = sprintf(
+                "Imagick Error in %s on line %d: %s",
+                basename($e->getFile()), // Hanya nama file, bukan path lengkap
+                $e->getLine(),
+                $e->getMessage()
+            );
+            return response()->json(['error' => $detailedError], 500);
+            // --- AKHIR PERUBAHAN ---
         }
-    }
-
-    /**
-     * Menangani proses OCR khusus untuk file PDF.
-     *
-     * @param \Illuminate\Http\UploadedFile $file
-     * @param string $credentialsPath
-     * @return string
-     * @throws \Exception
-     */
-    private function processPdf($file, string $credentialsPath): string
-    {
-        // GANTI DENGAN NAMA BUCKET GOOGLE CLOUD STORAGE ANDA
-        $bucketName = 'ganti-dengan-nama-bucket-anda';
-
-        // 1. Buat klien Google Cloud Storage.
-        $storage = new StorageClient(['keyFilePath' => $credentialsPath]);
-        $bucket = $storage->bucket($bucketName);
-
-        // 2. Unggah file PDF ke bucket.
-        $fileName = 'ocr-uploads/' . uniqid() . '-' . $file->getClientOriginalName();
-        $object = $bucket->upload(
-            fopen($file->getRealPath(), 'r'),
-            ['name' => $fileName]
-        );
-
-        // 3. Jalankan proses OCR asinkron pada file di bucket.
-        $imageAnnotator = new ImageAnnotatorClient(['credentials' => $credentialsPath]);
-        $gcsUri = "gs://{$bucketName}/{$fileName}";
-        $outputUri = "gs://{$bucketName}/ocr-outputs/" . uniqid() . '/';
-
-        $operation = $imageAnnotator->asyncBatchAnnotateFiles([
-            'requests' => [
-                [
-                    'input_config' => ['gcs_source' => ['uri' => $gcsUri], 'mime_type' => 'application/pdf'],
-                    'features' => [['type' => \Google\Cloud\Vision\V1\Feature\Type::DOCUMENT_TEXT_DETECTION]],
-                    'output_config' => ['gcs_destination' => ['uri' => $outputUri], 'batch_size' => 1],
-                ]
-            ]
-        ]);
-
-        // 4. Tunggu proses OCR selesai.
-        $operation->pollUntilComplete();
-
-        // 5. Baca hasil dari file JSON yang dibuat oleh Vision API.
-        $fullText = '';
-        $outputPrefix = str_replace("gs://{$bucketName}/", '', $outputUri);
-        $resultObjects = $bucket->objects(['prefix' => $outputPrefix]);
-
-        foreach ($resultObjects as $resultObject) {
-            $jsonString = $resultObject->downloadAsString();
-            $data = json_decode($jsonString, true);
-            foreach ($data['responses'] as $response) {
-                if (isset($response['fullTextAnnotation']['text'])) {
-                    $fullText .= $response['fullTextAnnotation']['text'];
-                }
-            }
-        }
-
-        // 6. Hapus file sementara dari bucket untuk menghemat ruang.
-        $object->delete();
-        foreach ($bucket->objects(['prefix' => $outputPrefix]) as $resultObject) {
-            $resultObject->delete();
-        }
-
-        $imageAnnotator->close();
-
-        return $fullText;
     }
 }
 
