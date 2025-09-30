@@ -4,68 +4,43 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Http;
-use Imagick;
-use Exception; // Tambahkan ini
+use thiagoalessio\TesseractOCR\TesseractOCR; // Menggunakan library Tesseract
+use Exception;
 
 class OcrController extends Controller
 {
+    /**
+     * Memproses file GAMBAR yang diunggah untuk OCR menggunakan Tesseract lokal.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function scan(Request $request): JsonResponse
     {
+        // Validasi hanya untuk gambar, karena PDF sudah diubah di frontend.
         $request->validate([
-            'ocr_file' => 'required|file|mimes:jpeg,png,jpg,pdf|max:5120',
+            'ocr_file' => 'required|image|max:5120', // Maksimal 5MB
         ]);
 
         try {
-            $apiKey = 'K85714586788957';
-            if ($apiKey === 'YOUR_API_KEY_HERE') {
-                return response()->json(['error' => 'API Key OCR.space belum diatur.'], 500);
-            }
-
             $file = $request->file('ocr_file');
-            $fileContent = file_get_contents($file->getRealPath());
-            $fileName = $file->getClientOriginalName();
+            $imagePath = $file->getRealPath();
 
-            if ($file->getMimeType() === 'application/pdf') {
-                $imagick = new Imagick();
-                $imagick->setResolution(300, 300);
-                $imagick->readImage($file->getRealPath() . '[0]');
-                $imagick->setImageFormat('png');
+            // Jalankan Tesseract pada file gambar
+            $text = (new TesseractOCR($imagePath))
+                ->lang('ind') // Memberitahu Tesseract untuk menggunakan bahasa Indonesia
+                ->run();
 
-                $fileContent = $imagick->getImageBlob();
-                $fileName = pathinfo($fileName, PATHINFO_FILENAME) . '.png';
-                $imagick->clear();
-                $imagick->destroy();
-            }
-
-            $response = Http::withHeaders(['apikey' => $apiKey])
-                ->attach('file', $fileContent, $fileName)
-                ->post('https://api.ocr.space/parse/image', [
-                    'language' => 'ind',
-                    'isOverlayRequired' => 'false',
-                    'OCREngine' => '1',
-                ]);
-
-            $result = $response->json();
-
-            if (isset($result['ParsedResults'][0]['ParsedText'])) {
-                return response()->json(['text' => $result['ParsedResults'][0]['ParsedText']]);
-            } else {
-                $errorMessage = $result['ErrorMessage'][0] ?? 'Gagal memproses dokumen.';
-                return response()->json(['error' => $errorMessage], 400);
-            }
+            return response()->json(['text' => $text]);
 
         } catch (Exception $e) {
-            // --- PERUBAHAN DI SINI ---
-            // Kode ini akan memberikan pesan error yang jauh lebih detail
-            $detailedError = sprintf(
-                "Imagick Error in %s on line %d: %s",
-                basename($e->getFile()), // Hanya nama file, bukan path lengkap
-                $e->getLine(),
-                $e->getMessage()
-            );
-            return response()->json(['error' => $detailedError], 500);
-            // --- AKHIR PERUBAHAN ---
+            // Menangkap error jika Tesseract tidak terinstal atau ada masalah lain
+            $errorMessage = 'Gagal memproses OCR: ' . $e->getMessage();
+            // Cek apakah error karena Tesseract tidak ditemukan
+            if (str_contains($e->getMessage(), 'Error executing command')) {
+                $errorMessage = 'Gagal menjalankan Tesseract. Pastikan Tesseract sudah terinstal dan ditambahkan ke PATH sistem.';
+            }
+            return response()->json(['error' => $errorMessage], 500);
         }
     }
 }
