@@ -105,22 +105,9 @@
 @endsection
 
 @push('script')
-    {{-- PERUBAHAN 1: Memuat library PDF.js dari file lokal proyek Anda --}}
-    <script src="{{ asset('assets/js/pdfjs/pdf.js') }}"></script>
-
     <script>
-        // Membungkus semua skrip dalam window.onload untuk memastikan semua file (termasuk pdf.js) sudah dimuat
-        window.onload = function() {
-            // Cek sekali lagi apakah library berhasil dimuat
-            if (typeof pdfjsLib === 'undefined') {
-                console.error('Library pdf.js gagal dimuat. Pastikan file ada di public/assets/js/pdfjs/ dan server berjalan.');
-                alert('Error kritis: Library pdf.js gagal dimuat. Periksa konsol (F12) untuk detail.');
-                return;
-            }
-
-            // PERUBAHAN 2: Konfigurasi worker untuk memuat file dari lokasi lokal
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `{{ asset('assets/js/pdfjs/pdf.worker.js') }}`;
-
+        // Skrip ini sekarang jauh lebih sederhana!
+        document.addEventListener('DOMContentLoaded', function() {
             const ocrFile = document.getElementById('ocr_file');
             const loadingSpinner = document.getElementById('ocr-loading');
             const ocrFilenameSpan = document.getElementById('ocr-filename');
@@ -135,37 +122,10 @@
                 const file = ocrFile.files[0];
                 ocrFilenameSpan.textContent = file.name;
                 loadingSpinner.classList.remove('d-none');
-                let fileToSend = file;
-
-                if (file.type === 'application/pdf') {
-                    ocrStatusText.textContent = 'Mengonversi PDF...';
-                    try {
-                        const pdfAsDataUri = await readFileAsDataURL(file);
-                        const pdf = await pdfjsLib.getDocument(pdfAsDataUri).promise;
-                        const page = await pdf.getPage(1);
-                        const viewport = page.getViewport({ scale: 2.0 });
-
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-
-                        await page.render({ canvasContext: context, viewport: viewport }).promise;
-
-                        fileToSend = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                        fileToSend.name = pathinfo(file.name, 'PATHINFO_FILENAME') + '.png';
-
-                    } catch (error) {
-                        console.error('PDF Conversion Error:', error);
-                        alert('Gagal mengonversi file PDF. File mungkin rusak atau tidak didukung.');
-                        loadingSpinner.classList.add('d-none');
-                        return;
-                    }
-                }
-
                 ocrStatusText.textContent = 'Memindai dokumen...';
+
                 const formData = new FormData();
-                formData.append('ocr_file', fileToSend, fileToSend.name);
+                formData.append('ocr_file', file);
                 formData.append('_token', '{{ csrf_token() }}');
 
                 fetch('{{ route("ocr.scan") }}', {
@@ -199,45 +159,60 @@
                     });
             });
 
-            function readFileAsDataURL(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            }
-            function pathinfo(path, options) {
-                const basename = path.split('/').pop();
-                if (options === 'PATHINFO_FILENAME') {
-                    return basename.substr(0, basename.lastIndexOf('.')) || basename;
-                }
-                return basename;
-            }
-
             function populateForm(text) {
+                // #1: Menampilkan hasil mentah di konsol untuk debugging
+                console.log("--- Teks Mentah dari OCR ---");
+                console.log(text);
+                console.log("---------------------------------");
+
                 const lines = text.split('\n');
                 let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
+
                 lines.forEach((line, index) => {
-                    if (line.toLowerCase().includes('nomor') && line.includes(':')) {
-                        dataExtracted.nomor = line.split(':')[1]?.trim().split(' ')[0] || '';
+                    // Ekstraksi Nomor Surat: Lebih fleksibel, mencari kata "Nomor" diikuti titik dua
+                    if (!dataExtracted.nomor && (line.toLowerCase().includes('nomor'))) {
+                        let parts = line.split(':');
+                        if (parts.length > 1) {
+                            // Ambil bagian setelah titik dua, bersihkan dari karakter aneh dan ambil kata pertama saja
+                            dataExtracted.nomor = parts[1].trim().split(' ')[0].replace(/[^a-zA-Z0-9\/.-]/g, '');
+                        }
                     }
-                    const dateRegex = /(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
+
+                    // Ekstraksi Tanggal Surat: Mencari format tanggal lengkap Indonesia
+                    const dateRegex = /(\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
                     const dateMatch = line.match(dateRegex);
-                    if (dateMatch) { dataExtracted.tanggal = convertDate(dateMatch[0]); }
-                    if (line.toLowerCase().includes('kepada yth.') || line.toLowerCase().startsWith('yth.')) {
-                        dataExtracted.dari = (lines[index + 1]?.trim() || '') + ' ' + (lines[index + 2]?.trim() || '');
+                    if (!dataExtracted.tanggal && dateMatch) {
+                        dataExtracted.tanggal = convertDate(dateMatch[0]);
                     }
-                    if (line.toLowerCase().includes('hal') && line.includes(':')) {
-                        dataExtracted.perihal = line.split(':')[1]?.trim() || '';
+
+                    // Ekstraksi Pengirim: Mencari "Kepada Yth." lalu mengambil 2 baris di bawahnya
+                    if (!dataExtracted.dari && (line.toLowerCase().includes('kepada yth'))) {
+                        let recipientLine1 = lines[index + 1]?.trim() || '';
+                        let recipientLine2 = lines[index + 2]?.trim() || '';
+                        dataExtracted.dari = `${recipientLine1} ${recipientLine2}`.trim();
+                    }
+
+                    // Ekstraksi Perihal: Mencari kata "Hal" atau "Perihal" diikuti titik dua
+                    if (!dataExtracted.perihal && (line.toLowerCase().startsWith('hal') || line.toLowerCase().startsWith('perihal'))) {
+                        let parts = line.split(':');
+                        if (parts.length > 1) {
+                            dataExtracted.perihal = parts[1].trim();
+                        }
                     }
                 });
+
+                // #2: Menampilkan hasil ekstraksi di konsol
+                console.log("--- Data yang Berhasil Diekstrak ---", dataExtracted);
+
+                // Mengisi formulir
                 if (dataExtracted.nomor) document.getElementById('reference_number').value = dataExtracted.nomor;
                 if (dataExtracted.tanggal) document.getElementById('letter_date').value = dataExtracted.tanggal;
-                if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari.trim();
+                if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari;
                 if (dataExtracted.perihal) document.getElementById('description').value = dataExtracted.perihal;
+
                 alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
             }
+
             function convertDate(dateString) {
                 const months = { 'januari': '01', 'februari': '02', 'maret': '03', 'april': '04', 'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08', 'september': '09', 'oktober': '10', 'november': '11', 'desember': '12' };
                 const parts = dateString.toLowerCase().replace(/,/g, '').split(' ');
@@ -249,7 +224,6 @@
                 }
                 return '';
             }
-        };
+        });
     </script>
 @endpush
-
