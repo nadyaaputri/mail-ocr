@@ -3,74 +3,61 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Symfony\Component\Process\Exception\ProcessFailedException;
-use Symfony\Component\Process\Process; // Menggunakan Symfony Process untuk menjalankan perintah
-use Exception;
+use GuzzleHttp\Client;
 
 class OcrController extends Controller
 {
-    /**
-     * Memproses file GAMBAR yang diunggah untuk OCR menggunakan skrip EasyOCR Python.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function scan(Request $request): JsonResponse
+    public function showUploadForm()
     {
-        // Validasi hanya untuk gambar, karena PDF diubah di frontend.
+        return view('upload');
+    }
+
+    public function processUpload(Request $request)
+    {
         $request->validate([
-            'ocr_file' => 'required|image|max:5120', // Maksimal 5MB
+            'file_surat' => 'required|image|mimes:jpeg,png,jpg,gif,bmp|max:5120', // Maks 5MB
         ]);
 
         try {
-            $file = $request->file('ocr_file');
-            $imagePath = $file->getRealPath(); // Path sementara file yang diunggah
+            // 1. Inisialisasi Guzzle Client
+            $client = new Client();
 
-            // Path ke interpreter Python (biasanya 'python' jika sudah di PATH)
-            $pythonExecutable = 'python';
-            // Path ke skrip Python kita (di direktori utama Laravel)
-            $scriptPath = base_path('ocr_processor.py');
+            // 2. Ambil file dari request
+            $file = $request->file('file_surat');
 
-            // Membuat perintah untuk dijalankan: python ocr_processor.py /path/ke/gambar.png
-            $process = new Process([$pythonExecutable, $scriptPath, $imagePath]);
-            $process->run();
+            // 3. Tentukan URL API Python Anda
+            // Pastikan URL ini benar (ganti jika API Anda di server lain)
+            $ocrApiUrl = 'http://localhost:8000/ocr';
 
-            // Cek apakah skrip Python berhasil dijalankan
-            if (!$process->isSuccessful()) {
-                // Jika gagal, lempar exception dengan output error dari Python
-                throw new ProcessFailedException($process);
-            }
-
-            // Ambil output JSON dari skrip Python
-            $output = json_decode($process->getOutput(), true);
-
-            // Periksa output JSON
-            if (isset($output['success']) && $output['success']) {
-                // Jika sukses, kembalikan teks hasil OCR
-                return response()->json(['text' => $output['text']]);
-            } else {
-                // Jika skrip Python mengembalikan error, teruskan pesan errornya
-                $errorMessage = $output['error'] ?? 'Skrip Python OCR gagal tanpa pesan error.';
-                return response()->json(['error' => $errorMessage], 500);
-            }
-
-        } catch (ProcessFailedException $exception) {
-            // Error jika perintah Python itu sendiri gagal dijalankan
-            // (misal: Python tidak ditemukan, skrip tidak ada, dll.)
-            return response()->json(['error' => 'Gagal menjalankan proses OCR Python: ' . $exception->getErrorOutput()], 500);
-        } catch (Exception $e) {
-            // Mencatat error lengkap ke file log Laravel
-            \Illuminate\Support\Facades\Log::error('OCR Scan Failed: ' . $e->getMessage(), [
-                'exception' => $e,
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString() // Menambahkan trace lengkap
+            // 4. Kirim request POST dengan 'multipart/form-data'
+            $response = $client->request('POST', $ocrApiUrl, [
+                'multipart' => [
+                    [
+                        'name'     => 'file', // Nama field 'file' (sesuai di FastAPI)
+                        'contents' => fopen($file->getPathname(), 'r'),
+                        'filename' => $file->getClientOriginalName()
+                    ]
+                ]
             ]);
 
-            // Tetap kirim pesan error umum ke pengguna
-            return response()->json(['error' => 'Terjadi masalah pada server. Silakan cek log aplikasi.'], 500);
-            // --- AKHIR PERUBAHAN ---
+            // 5. Ambil hasil dari API
+            $body = $response->getBody()->getContents();
+            $result = json_decode($body, true);
+
+            // 6. Cek jika sukses dan kirim data ke view
+            if ($result['status'] == 'success') {
+                // $result['result_text'] akan berisi array teks
+                // Anda bisa olah data ini (misal: simpan ke DB)
+                // sebelum menampilkannya
+                return redirect()->route('surat.upload.form')
+                    ->with('ocr_results', $result['result_text']);
+            } else {
+                return back()->with('error', 'Gagal memproses OCR: ' . $result['message']);
+            }
+
+        } catch (\Exception $e) {
+            // Tangani jika API Python mati atau ada error jaringan
+            return back()->with('error', 'Gagal terhubung ke service OCR: ' . $e->getMessage());
         }
     }
 }

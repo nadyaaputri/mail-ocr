@@ -5,7 +5,7 @@
         :values="[__('menu.transaction.menu'), __('menu.transaction.incoming_letter'), __('menu.general.create')]">
     </x-breadcrumb>
 
-    {{-- KARTU FITUR OCR --}}
+    {{-- KARTU FITUR OCR (Tidak ada perubahan di HTML) --}}
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="card-title mb-0">Otomatisasi dengan OCR</h5>
@@ -15,6 +15,7 @@
                 <div class="col-md-8">
                     <label class="form-label">Unggah Dokumen & Pindai Otomatis</label>
                     <div>
+                        {{-- ID 'ocr_file' akan digunakan oleh JavaScript --}}
                         <input class="form-control d-none" type="file" id="ocr_file" name="ocr_file" accept="image/*,application/pdf">
                         <label for="ocr_file" class="btn btn-primary">
                             <i class="bx bx-upload me-1"></i> Pilih Dokumen (Gambar/PDF)...
@@ -33,7 +34,7 @@
         </div>
     </div>
 
-    {{-- FORMULIR PEMBUATAN SURAT LENGKAP --}}
+    {{-- FORMULIR PEMBUATAN SURAT LENGKAP (Tidak ada perubahan di HTML) --}}
     <div class="card">
         <div class="card-header">
             <h5 class="card-title mb-0">Formulir Surat Masuk</h5>
@@ -43,6 +44,7 @@
                 @csrf
                 <input type="hidden" name="type" value="incoming">
                 <div class="row">
+                    {{-- Semua ID field di bawah ini (cth: 'reference_number', 'letter_date') digunakan oleh JS --}}
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="reference_number" class="form-label">Nomor Referensi</label>
@@ -106,12 +108,15 @@
 
 @push('script')
     <script>
-        // Skrip ini sekarang jauh lebih sederhana!
+        // --- BLOK SCRIPT INI TELAH DIMODIFIKASI ---
         document.addEventListener('DOMContentLoaded', function() {
             const ocrFile = document.getElementById('ocr_file');
             const loadingSpinner = document.getElementById('ocr-loading');
             const ocrFilenameSpan = document.getElementById('ocr-filename');
             const ocrStatusText = document.getElementById('ocr-status-text');
+
+            // URL API Python (FastAPI). Pastikan ini benar dan server Python berjalan.
+            const OCR_API_URL = 'http://localhost:8001/ocr'; // <-- UBAHAN PENTING
 
             ocrFile.addEventListener('change', async function() {
                 if (ocrFile.files.length === 0) {
@@ -122,81 +127,109 @@
                 const file = ocrFile.files[0];
                 ocrFilenameSpan.textContent = file.name;
                 loadingSpinner.classList.remove('d-none');
-                ocrStatusText.textContent = 'Memindai dokumen...';
+                ocrStatusText.textContent = 'Mengirim ke API OCR...';
 
                 const formData = new FormData();
-                formData.append('ocr_file', file);
-                formData.append('_token', '{{ csrf_token() }}');
+                // 'file' harus cocok dengan nama parameter di 'main.py' (FastAPI)
+                formData.append('file', file); // <-- UBAHAN NAMA FIELD
 
-                fetch('{{ route("ocr.scan") }}', {
+                // Hapus _token dan header Laravel, karena ini memanggil API eksternal
+
+                fetch(OCR_API_URL, { // <-- UBAHAN URL
                     method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json',
-                    },
                     body: formData,
+                    // Tidak perlu headers 'X-CSRF-TOKEN' atau 'X-Requested-With'
                 })
                     .then(response => {
                         if (!response.ok) {
-                            return response.json().then(err => { throw new Error(err.error || 'Terjadi masalah pada server.') });
+                            // Tangani error HTTP (misal: API Python mati atau error 500)
+                            return response.json().then(err => {
+                                throw new Error(err.message || 'Server API OCR tidak merespon/error.')
+                            });
                         }
                         return response.json();
                     })
                     .then(data => {
-                        if (data.error) {
-                            alert('Error: ' + data.error);
+                        // Sesuaikan dengan format respons JSON dari FastAPI
+                        if (data.status === 'success' && data.result_text) {
+                            ocrStatusText.textContent = 'Memproses teks...';
+                            // Kirim array 'result_text' langsung ke populateForm
+                            populateForm(data.result_text); // <-- UBAHAN PARAMETER
                         } else {
-                            populateForm(data.text);
+                            // Tangani error logis dari API (misal: "status": "error")
+                            throw new Error(data.message || 'Gagal memproses OCR.');
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alert('Gagal melakukan OCR: ' + error.message);
+                        ocrStatusText.textContent = 'Gagal: ' + error.message;
+                        // Tampilkan pesan error di UI
+                        alert('Gagal melakukan OCR: ' + error.message + '\n(Cek konsol untuk detail & pastikan API Python berjalan)');
                     })
                     .finally(() => {
+                        // Sembunyikan loading dan reset input file
                         loadingSpinner.classList.add('d-none');
-                        ocrFile.value = ''; // Reset input file
+                        ocrFile.value = '';
+                        ocrFilenameSpan.textContent = 'Belum ada file dipilih';
                     });
             });
 
-            function populateForm(text) {
+            // --- FUNGSI PARSING INI TELAH DIMODIFIKASI ---
+            function populateForm(lines) { // <-- UBAHAN: Parameter 'lines' sekarang adalah ARRAY
                 // #1: Menampilkan hasil mentah di konsol untuk debugging
-                console.log("--- Teks Mentah dari OCR ---");
-                console.log(text);
+                console.log("--- Teks Mentah dari OCR (Array) ---");
+                console.log(lines); // 'lines' sudah berupa array, tidak perlu .split()
                 console.log("---------------------------------");
 
-                const lines = text.split('\n');
+                // HAPUS BARIS INI: const lines = text.split('\n');
+
                 let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
 
+                // Logika parsing Anda sebelumnya sudah bagus, kita pertahankan.
+                // Logika ini mungkin perlu Anda sesuaikan lagi setelah melihat
+                // hasil *sebenarnya* dari PaddleOCR.
                 lines.forEach((line, index) => {
+                    line = line.trim(); // Pastikan tidak ada spasi ekstra
+                    if (!line) return; // Lewati baris kosong
+
                     // Ekstraksi Nomor Surat: Lebih fleksibel, mencari kata "Nomor" diikuti titik dua
                     if (!dataExtracted.nomor && (line.toLowerCase().includes('nomor'))) {
                         let parts = line.split(':');
                         if (parts.length > 1) {
-                            // Ambil bagian setelah titik dua, bersihkan dari karakter aneh dan ambil kata pertama saja
-                            dataExtracted.nomor = parts[1].trim().split(' ')[0].replace(/[^a-zA-Z0-9\/.-]/g, '');
+                            // Ambil bagian setelah titik dua, bersihkan
+                            let extractedNomor = parts.slice(1).join(':').trim();
+                            // Coba bersihkan dari karakter aneh
+                            extractedNomor = extractedNomor.replace(/[^\w\s\/-.]/g, '');
+                            dataExtracted.nomor = extractedNomor;
                         }
                     }
 
                     // Ekstraksi Tanggal Surat: Mencari format tanggal lengkap Indonesia
+                    // Regex ini mencari: 12 April 2025 atau 1 April 2025
                     const dateRegex = /(\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
                     const dateMatch = line.match(dateRegex);
-                    if (!dataExtracted.tanggal && dateMatch) {
+                    if (!dataExtracted.tanggal && dateMatch && dateMatch[0]) {
                         dataExtracted.tanggal = convertDate(dateMatch[0]);
                     }
 
-                    // Ekstraksi Pengirim: Mencari "Kepada Yth." lalu mengambil 2 baris di bawahnya
+                    // Ekstraksi Pengirim: Mencari "Kepada Yth." lalu mengambil 1-2 baris di bawahnya
+                    // Logika ini SANGAT spesifik dan mungkin salah.
                     if (!dataExtracted.dari && (line.toLowerCase().includes('kepada yth'))) {
                         let recipientLine1 = lines[index + 1]?.trim() || '';
                         let recipientLine2 = lines[index + 2]?.trim() || '';
-                        dataExtracted.dari = `${recipientLine1} ${recipientLine2}`.trim();
+                        // Asumsi pengirim ada di baris setelah Yth.
+                        dataExtracted.dari = recipientLine1;
+                        // Jika baris pertama kosong, ambil baris kedua
+                        if (!dataExtracted.dari && recipientLine2) {
+                            dataExtracted.dari = recipientLine2;
+                        }
                     }
 
                     // Ekstraksi Perihal: Mencari kata "Hal" atau "Perihal" diikuti titik dua
                     if (!dataExtracted.perihal && (line.toLowerCase().startsWith('hal') || line.toLowerCase().startsWith('perihal'))) {
                         let parts = line.split(':');
                         if (parts.length > 1) {
-                            dataExtracted.perihal = parts[1].trim();
+                            dataExtracted.perihal = parts.slice(1).join(':').trim();
                         }
                     }
                 });
@@ -213,9 +246,10 @@
                 alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
             }
 
+            // Fungsi helper konversi tanggal (Tidak ada perubahan)
             function convertDate(dateString) {
                 const months = { 'januari': '01', 'februari': '02', 'maret': '03', 'april': '04', 'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08', 'september': '09', 'oktober': '10', 'november': '11', 'desember': '12' };
-                const parts = dateString.toLowerCase().replace(/,/g, '').split(' ');
+                const parts = dateString.toLowerCase().replace(/,/g, '').split(' ').filter(Boolean); // filter(Boolean) u/ hapus spasi ganda
                 if (parts.length === 3) {
                     const day = parts[0].padStart(2, '0');
                     const month = months[parts[1]];

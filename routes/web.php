@@ -79,7 +79,12 @@ Route::middleware(['auth'])->group(function () {
     // Route untuk memproses data dari form registrasi
     Route::post('/register', [AuthController::class, 'register'])->name('register.perform');
 
-    Route::post('/scan-ocr', [OcrController::class, 'scan'])->name('ocr.scan');
+    // Menampilkan form upload
+    Route::get('/upload-surat', [OcrController::class, 'showUploadForm'])->name('surat.upload.form');
+
+    // Memproses file yang di-upload
+    Route::post('/upload-surat', [OcrController::class, 'processUpload'])->name('surat.upload.process');
+
 
 
 

@@ -4,7 +4,7 @@
     class="light-style layout-menu-fixed"
     dir="ltr"
     data-theme="theme-default"
-    data-assets-path="{{ asset('public/sneat/') }}"
+    data-assets-path="{{ asset('sneat/') }}"
     data-template="vertical-menu-template-free"
 >
 <head>
