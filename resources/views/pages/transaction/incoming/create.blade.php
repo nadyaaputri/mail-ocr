@@ -174,56 +174,62 @@
                     });
             });
 
-            // --- FUNGSI PARSING INI TELAH DIMODIFIKASI ---
-            function populateForm(lines) { // <-- UBAHAN: Parameter 'lines' sekarang adalah ARRAY
-                // #1: Menampilkan hasil mentah di konsol untuk debugging
-                console.log("--- Teks Mentah dari OCR (Array) ---");
-                console.log(lines); // 'lines' sudah berupa array, tidak perlu .split()
-                console.log("---------------------------------");
+                // --- GANTI FUNGSI LAMA ANDA DENGAN VERSI BARU INI ---
+                function populateForm(lines) {
+                    // #1: LOG UNTUK MELIHAT HASIL MENTAH DARI API PYTHON
+                    console.log("--- Teks Mentah dari OCR (Array) ---");
+                    console.log(lines);
+                    console.log("---------------------------------");
 
-                // HAPUS BARIS INI: const lines = text.split('\n');
+                    let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
 
-                let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
+                    lines.forEach((line, index) => {
+                        line = line.trim();
+                        if (!line) return;
 
-                // Logika parsing Anda sebelumnya sudah bagus, kita pertahankan.
-                // Logika ini mungkin perlu Anda sesuaikan lagi setelah melihat
-                // hasil *sebenarnya* dari PaddleOCR.
-                lines.forEach((line, index) => {
-                    line = line.trim(); // Pastikan tidak ada spasi ekstra
-                    if (!line) return; // Lewati baris kosong
-
-                    // Ekstraksi Nomor Surat: Lebih fleksibel, mencari kata "Nomor" diikuti titik dua
-                    if (!dataExtracted.nomor && (line.toLowerCase().includes('nomor'))) {
-                        let parts = line.split(':');
-                        if (parts.length > 1) {
-                            // Ambil bagian setelah titik dua, bersihkan
-                            let extractedNomor = parts.slice(1).join(':').trim();
-                            // Coba bersihkan dari karakter aneh
-                            extractedNomor = extractedNomor.replace(/[^\w\s\/-.]/g, '');
-                            dataExtracted.nomor = extractedNomor;
+                        // Ekstraksi Nomor Surat
+                        if (!dataExtracted.nomor && (line.toLowerCase().includes('nomor'))) {
+                            let parts = line.split(':');
+                            if (parts.length > 1) {
+                                let extractedNomor = parts.slice(1).join(':').trim();
+                                dataExtracted.nomor = extractedNomor.replace(/[^\w\s\/\-.]/g, '');
+                            }
                         }
-                    }
 
-                    // Ekstraksi Tanggal Surat: Mencari format tanggal lengkap Indonesia
-                    // Regex ini mencari: 12 April 2025 atau 1 April 2025
-                    const dateRegex = /(\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
-                    const dateMatch = line.match(dateRegex);
-                    if (!dataExtracted.tanggal && dateMatch && dateMatch[0]) {
-                        dataExtracted.tanggal = convertDate(dateMatch[0]);
-                    }
-
-                    // Ekstraksi Pengirim: Mencari "Kepada Yth." lalu mengambil 1-2 baris di bawahnya
-                    // Logika ini SANGAT spesifik dan mungkin salah.
-                    if (!dataExtracted.dari && (line.toLowerCase().includes('kepada yth'))) {
-                        let recipientLine1 = lines[index + 1]?.trim() || '';
-                        let recipientLine2 = lines[index + 2]?.trim() || '';
-                        // Asumsi pengirim ada di baris setelah Yth.
-                        dataExtracted.dari = recipientLine1;
-                        // Jika baris pertama kosong, ambil baris kedua
-                        if (!dataExtracted.dari && recipientLine2) {
-                            dataExtracted.dari = recipientLine2;
+                        // Ekstraksi Tanggal Surat
+                        const dateRegex = /(\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
+                        const dateMatch = line.match(dateRegex);
+                        if (!dataExtracted.tanggal && dateMatch && dateMatch[0]) {
+                            dataExtracted.tanggal = convertDate(dateMatch[0]);
                         }
-                    }
+
+                        // Ekstraksi Pengirim
+                        if (!dataExtracted.dari && (line.toLowerCase().includes('kepada yth'))) {
+                            dataExtracted.dari = lines[index + 1]?.trim() || '';
+                        }
+
+                        // Ekstraksi Perihal
+                        if (!dataExtracted.perihal && (line.toLowerCase().startsWith('hal') || line.toLowerCase().startsWith('perihal'))) {
+                            let parts = line.split(':');
+                            if (parts.length > 1) {
+                                dataExtracted.perihal = parts.slice(1).join(':').trim();
+                            }
+                        }
+                    });
+
+                    // #2: LOG UNTUK MELIHAT APA YANG BERHASIL DIEKSTRAK
+                    console.log("--- Data yang Berhasil Diekstrak ---");
+                    console.log(dataExtracted);
+                    console.log("---------------------------------");
+
+                    // Mengisi formulir
+                    if (dataExtracted.nomor) document.getElementById('reference_number').value = dataExtracted.nomor;
+                    if (dataExtracted.tanggal) document.getElementById('letter_date').value = dataExtracted.tanggal;
+                    if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari;
+                    if (dataExtracted.perihal) document.getElementById('description').value = dataExtracted.perihal;
+
+                    alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
+                }
 
                     // Ekstraksi Perihal: Mencari kata "Hal" atau "Perihal" diikuti titik dua
                     if (!dataExtracted.perihal && (line.toLowerCase().startsWith('hal') || line.toLowerCase().startsWith('perihal'))) {

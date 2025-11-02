@@ -42,11 +42,11 @@ async def process_ocr(file: UploadFile = File(...)):
         contents = await file.read()
 
         # Konversi gambar ke format yang bisa dibaca OpenCV/PaddleOCR
-        nparr = np.fromstring(contents, np.uint8)
+        nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         # Jalankan proses OCR
-        result = ocr.ocr(img, cls=True)
+        result = ocr.ocr(img)
 
         # Ekstrak hanya teks dari hasil
         # Hasil mentah 'result' berisi [bounding_box, (text, confidence_score)]
