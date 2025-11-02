@@ -1,18 +1,17 @@
 import uvicorn
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from paddleocr import PaddleOCR
 import numpy as np
 import cv2
-from fastapi.middleware.cors import CORSMiddleware
 
 # Inisialisasi aplikasi FastAPI
 app = FastAPI(title="PaddleOCR API Service")
 
-# Tentukan domain Laravel Anda
+# --- Konfigurasi CORS ---
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://localhost", # Jika Anda pakai virtual host
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -22,9 +21,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Muat model PaddleOCR saat aplikasi dimulai
-# 'id' untuk Bahasa Indonesia, 'en' untuk Inggris. Bisa keduanya: ['id', 'en']
+# --- Muat Model OCR ---
 print("Memuat model PaddleOCR...")
+# Pastikan bahasa 'id' (Indonesia) sudah di-instal
 ocr = PaddleOCR(use_angle_cls=True, lang='id')
 print("Model berhasil dimuat.")
 
@@ -38,34 +37,43 @@ async def process_ocr(file: UploadFile = File(...)):
     Endpoint untuk menerima gambar dan mengembalikan hasil OCR.
     """
     try:
-        # Baca file gambar yang di-upload
+        print(f"\n--- Menerima file: {file.filename} ---")
         contents = await file.read()
 
-        # Konversi gambar ke format yang bisa dibaca OpenCV/PaddleOCR
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Jalankan proses OCR
+        if img is None:
+            print("!!! ERROR: cv2.imdecode gagal memuat gambar.")
+            return {"status": "error", "message": "Gagal membaca file gambar. Pastikan file adalah JPG/PNG yang valid."}
+
+        print("Mulai menjalankan ocr.ocr(img)...")
         result = ocr.ocr(img)
+        print("Proses ocr.ocr(img) selesai.")
 
-        # Ekstrak hanya teks dari hasil
-        # Hasil mentah 'result' berisi [bounding_box, (text, confidence_score)]
-        # Kita ambil teksnya saja.
-
+        # --- INI ADALAH PERBAIKANNYA ---
         extracted_text = []
         if result and result[0] is not None:
-            for line in result[0]:
-                extracted_text.append(line[1][0]) # Ambil teksnya saja
+            # Kita langsung ambil dari kunci 'rec_texts'
+            if 'rec_texts' in result[0]:
+                extracted_text = result[0]['rec_texts']
+                print(f"Teks yang diekstrak (BERHASIL): {extracted_text}")
+            else:
+                print("!!! ERROR: 'rec_texts' key not found in PaddleOCR result.")
+        else:
+            print("!!! ERROR: PaddleOCR returned an empty or invalid result.")
+        # --- AKHIR PERBAIKAN ---
 
         return {
             "status": "success",
             "filename": file.filename,
-            "result_text": extracted_text # Mengembalikan array berisi baris-baris teks
+            "result_text": extracted_text # Ini sekarang akan berisi teks yang benar
         }
 
     except Exception as e:
+        print(f"!!! ERROR FATAL DI FUNGSI OCR: {str(e)}")
         return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
-    # Jalankan server API
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Jalankan server API di port 8001
+    uvicorn.run(app, host="0.0.0.0", port=8001)

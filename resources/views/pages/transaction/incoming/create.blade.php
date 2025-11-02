@@ -108,21 +108,23 @@
 
 @push('script')
     <script>
-        // --- BLOK SCRIPT INI TELAH DIMODIFIKASI ---
         document.addEventListener('DOMContentLoaded', function() {
+            // --- BAGIAN 1: DEFINISI ELEMEN ---
             const ocrFile = document.getElementById('ocr_file');
             const loadingSpinner = document.getElementById('ocr-loading');
             const ocrFilenameSpan = document.getElementById('ocr-filename');
             const ocrStatusText = document.getElementById('ocr-status-text');
 
-            // URL API Python (FastAPI). Pastikan ini benar dan server Python berjalan.
-            const OCR_API_URL = 'http://localhost:8001/ocr'; // <-- UBAHAN PENTING
+            const OCR_API_URL = 'http://localhost:8001/ocr'; // Pastikan API Python berjalan di port 8001
 
+            // --- BAGIAN 2: EVENT LISTENER ---
             ocrFile.addEventListener('change', async function() {
                 if (ocrFile.files.length === 0) {
                     ocrFilenameSpan.textContent = 'Belum ada file dipilih';
                     return;
                 }
+
+                console.log("Mulai proses: file dipilih...");
 
                 const file = ocrFile.files[0];
                 ocrFilenameSpan.textContent = file.name;
@@ -130,19 +132,15 @@
                 ocrStatusText.textContent = 'Mengirim ke API OCR...';
 
                 const formData = new FormData();
-                // 'file' harus cocok dengan nama parameter di 'main.py' (FastAPI)
-                formData.append('file', file); // <-- UBAHAN NAMA FIELD
+                formData.append('file', file);
 
-                // Hapus _token dan header Laravel, karena ini memanggil API eksternal
-
-                fetch(OCR_API_URL, { // <-- UBAHAN URL
+                fetch(OCR_API_URL, {
                     method: 'POST',
                     body: formData,
-                    // Tidak perlu headers 'X-CSRF-TOKEN' atau 'X-Requested-With'
                 })
                     .then(response => {
+                        console.log("Menerima respons dari API...");
                         if (!response.ok) {
-                            // Tangani error HTTP (misal: API Python mati atau error 500)
                             return response.json().then(err => {
                                 throw new Error(err.message || 'Server API OCR tidak merespon/error.')
                             });
@@ -150,98 +148,70 @@
                         return response.json();
                     })
                     .then(data => {
-                        // Sesuaikan dengan format respons JSON dari FastAPI
+                        console.log("API Sukses. Memanggil populateForm...");
                         if (data.status === 'success' && data.result_text) {
                             ocrStatusText.textContent = 'Memproses teks...';
-                            // Kirim array 'result_text' langsung ke populateForm
-                            populateForm(data.result_text); // <-- UBAHAN PARAMETER
+                            populateForm(data.result_text); // Kirim array 'result_text'
                         } else {
-                            // Tangani error logis dari API (misal: "status": "error")
                             throw new Error(data.message || 'Gagal memproses OCR.');
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         ocrStatusText.textContent = 'Gagal: ' + error.message;
-                        // Tampilkan pesan error di UI
                         alert('Gagal melakukan OCR: ' + error.message + '\n(Cek konsol untuk detail & pastikan API Python berjalan)');
                     })
                     .finally(() => {
-                        // Sembunyikan loading dan reset input file
                         loadingSpinner.classList.add('d-none');
                         ocrFile.value = '';
                         ocrFilenameSpan.textContent = 'Belum ada file dipilih';
                     });
-            });
+            }); // <-- Akhir dari addEventListener
 
-                // --- GANTI FUNGSI LAMA ANDA DENGAN VERSI BARU INI ---
-                function populateForm(lines) {
-                    // #1: LOG UNTUK MELIHAT HASIL MENTAH DARI API PYTHON
-                    console.log("--- Teks Mentah dari OCR (Array) ---");
-                    console.log(lines);
-                    console.log("---------------------------------");
+            // --- BAGIAN 3: FUNGSI PARSING OCR (VERSI BARU) ---
+            function populateForm(lines) {
+                console.log("--- Teks Mentah dari OCR ---");
+                console.log(lines);
 
-                    let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
+                let dataExtracted = { nomor: '', tanggal: '', dari: '', perihal: '' };
 
-                    lines.forEach((line, index) => {
-                        line = line.trim();
-                        if (!line) return;
+                // Iterasi setiap baris
+                lines.forEach((line, index) => {
+                    let lowerLine = line.toLowerCase().trim();
 
-                        // Ekstraksi Nomor Surat
-                        if (!dataExtracted.nomor && (line.toLowerCase().includes('nomor'))) {
-                            let parts = line.split(':');
-                            if (parts.length > 1) {
-                                let extractedNomor = parts.slice(1).join(':').trim();
-                                dataExtracted.nomor = extractedNomor.replace(/[^\w\s\/\-.]/g, '');
-                            }
+                    // 1. Ekstraksi Nomor
+                    if (lowerLine === 'nomor' && !dataExtracted.nomor) {
+                        let nextLine = lines[index + 1]?.trim() || '';
+                        if (nextLine.startsWith(':')) {
+                            // Ambil teks setelah ':', bersihkan, dan perbaiki bug regex
+                            dataExtracted.nomor = nextLine.substring(1).trim().replace(/[^\w\s\/\-.]/g, '');
                         }
+                    }
 
-                        // Ekstraksi Tanggal Surat
-                        const dateRegex = /(\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
-                        const dateMatch = line.match(dateRegex);
-                        if (!dataExtracted.tanggal && dateMatch && dateMatch[0]) {
-                            dataExtracted.tanggal = convertDate(dateMatch[0]);
-                        }
+                    // 2. Ekstraksi Tanggal
+                    const dateRegex = /(\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i;
+                    const dateMatch = line.match(dateRegex);
+                    if (dateMatch && dateMatch[0] && !dataExtracted.tanggal) {
+                        dataExtracted.tanggal = convertDate(dateMatch[0]);
+                    }
 
-                        // Ekstraksi Pengirim
-                        if (!dataExtracted.dari && (line.toLowerCase().includes('kepada yth'))) {
-                            dataExtracted.dari = lines[index + 1]?.trim() || '';
-                        }
+                    // 3. Ekstraksi Perihal (Hal)
+                    if (lowerLine === 'hal' && !dataExtracted.perihal) {
+                        let perihalLines = [];
+                        perihalLines.push(lines[index + 1]?.trim() || '');
+                        perihalLines.push(lines[index + 2]?.trim() || '');
+                        perihalLines.push(lines[index + 3]?.trim() || '');
+                        dataExtracted.perihal = perihalLines.filter(Boolean).join(' ');
+                    }
 
-                        // Ekstraksi Perihal
-                        if (!dataExtracted.perihal && (line.toLowerCase().startsWith('hal') || line.toLowerCase().startsWith('perihal'))) {
-                            let parts = line.split(':');
-                            if (parts.length > 1) {
-                                dataExtracted.perihal = parts.slice(1).join(':').trim();
-                            }
-                        }
-                    });
-
-                    // #2: LOG UNTUK MELIHAT APA YANG BERHASIL DIEKSTRAK
-                    console.log("--- Data yang Berhasil Diekstrak ---");
-                    console.log(dataExtracted);
-                    console.log("---------------------------------");
-
-                    // Mengisi formulir
-                    if (dataExtracted.nomor) document.getElementById('reference_number').value = dataExtracted.nomor;
-                    if (dataExtracted.tanggal) document.getElementById('letter_date').value = dataExtracted.tanggal;
-                    if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari;
-                    if (dataExtracted.perihal) document.getElementById('description').value = dataExtracted.perihal;
-
-                    alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
-                }
-
-                    // Ekstraksi Perihal: Mencari kata "Hal" atau "Perihal" diikuti titik dua
-                    if (!dataExtracted.perihal && (line.toLowerCase().startsWith('hal') || line.toLowerCase().startsWith('perihal'))) {
-                        let parts = line.split(':');
-                        if (parts.length > 1) {
-                            dataExtracted.perihal = parts.slice(1).join(':').trim();
-                        }
+                    // 4. Ekstraksi Pengirim (From)
+                    if (line.includes('BIRO PENGADAAN BARANG DAN JASA') && !dataExtracted.dari) {
+                        dataExtracted.dari = line.trim();
                     }
                 });
 
-                // #2: Menampilkan hasil ekstraksi di konsol
-                console.log("--- Data yang Berhasil Diekstrak ---", dataExtracted);
+                console.log("--- Data yang Berhasil Diekstrak ---");
+                console.log(dataExtracted);
 
                 // Mengisi formulir
                 if (dataExtracted.nomor) document.getElementById('reference_number').value = dataExtracted.nomor;
@@ -252,10 +222,10 @@
                 alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
             }
 
-            // Fungsi helper konversi tanggal (Tidak ada perubahan)
+            // --- BAGIAN 4: FUNGSI HELPER TANGGAL ---
             function convertDate(dateString) {
                 const months = { 'januari': '01', 'februari': '02', 'maret': '03', 'april': '04', 'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08', 'september': '09', 'oktober': '10', 'november': '11', 'desember': '12' };
-                const parts = dateString.toLowerCase().replace(/,/g, '').split(' ').filter(Boolean); // filter(Boolean) u/ hapus spasi ganda
+                const parts = dateString.toLowerCase().replace(/,/g, '').split(' ').filter(Boolean);
                 if (parts.length === 3) {
                     const day = parts[0].padStart(2, '0');
                     const month = months[parts[1]];
@@ -264,6 +234,7 @@
                 }
                 return '';
             }
-        });
+
+        }); // <-- Akhir dari DOMContentLoaded
     </script>
 @endpush
