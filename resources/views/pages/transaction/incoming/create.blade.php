@@ -219,7 +219,13 @@
                 if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari;
                 if (dataExtracted.perihal) document.getElementById('description').value = dataExtracted.perihal;
 
-                alert('Formulir telah diisi berdasarkan hasil OCR. Silakan periksa kembali data sebelum menyimpan.');
+                Swal.fire({
+                    title: 'OCR Berhasil!',
+                    text: 'Formulir telah diisi. Silakan periksa kembali data sebelum menyimpan.',
+                    icon: 'success',
+                    confirmButtonText: 'Mengerti',
+                    confirmButtonColor: '#696cff' // Ini adalah warna primer tema Sneat Anda
+                });
             }
 
             // --- BAGIAN 4: FUNGSI HELPER TANGGAL ---
