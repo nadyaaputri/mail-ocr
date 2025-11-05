@@ -205,7 +205,7 @@
                     }
 
                     // 4. Ekstraksi Pengirim (From)
-                    if (line.includes('BIRO PENGADAAN BARANG DAN JASA') && !dataExtracted.dari) {
+                    if (line.includes('') && !dataExtracted.dari) {
                         dataExtracted.dari = line.trim();
                     }
                 });
