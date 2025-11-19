@@ -24,7 +24,13 @@ app.add_middleware(
 # --- Muat Model OCR ---
 print("Memuat model PaddleOCR...")
 # Pastikan bahasa 'id' (Indonesia) sudah di-instal
-ocr = PaddleOCR(use_angle_cls=True, lang='id')
+ocr = PaddleOCR(
+    use_angle_cls=True,
+    lang='id',
+    det_db_thresh=0.3,      # Default 0.3. Turunkan ke 0.1 atau 0.2 jika teks pudar tidak terdeteksi.
+    det_db_box_thresh=0.5,  # Default 0.6. Batas keyakinan "apakah ini kotak teks?". Turunkan agar kotak yang ragu-ragu tetap diambil.
+    det_db_unclip_ratio=1.6 # Default 1.5. Memperluas area kotak sedikit agar huruf di pinggir tidak terpotong.
+)
 print("Model berhasil dimuat.")
 
 @app.get("/")
@@ -45,7 +51,7 @@ async def process_ocr(file: UploadFile = File(...)):
 
         if img is None:
             print("!!! ERROR: cv2.imdecode gagal memuat gambar.")
-            return {"status": "error", "message": "Gagal membaca file gambar. Pastikan file adalah JPG/PNG yang valid."}
+            return {"status": "error", "message": "Gagal membaca file gambar. Pastikan file adalah JPG/PNG."}
 
         print("Mulai menjalankan ocr.ocr(img)...")
         result = ocr.ocr(img)
