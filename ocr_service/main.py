@@ -77,3 +77,4 @@ async def process_ocr(file: UploadFile = File(...)):
 if __name__ == "__main__":
     # Jalankan server API di port 8001
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
