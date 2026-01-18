@@ -1,87 +1,74 @@
 import uvicorn
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from paddleocr import PaddleOCR
 import numpy as np
 import cv2
+import fitz  # PyMuPDF untuk PDF
 
-# Inisialisasi aplikasi FastAPI
-app = FastAPI(title="PaddleOCR API Service")
+app = FastAPI(title="OCR Service - Auto Accuracy")
 
-# --- Konfigurasi CORS ---
-origins = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Konfigurasi CORS agar Laravel Anda bisa akses
+origins = ["http://localhost:8000", "http://127.0.0.1:8000"]
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
 
-# --- Muat Model OCR ---
+# Load model satu kali saat start
 print("Memuat model PaddleOCR...")
-# Pastikan bahasa 'id' (Indonesia) sudah di-instal
-ocr = PaddleOCR(
-    use_angle_cls=True,
-    lang='id',
-    det_db_thresh=0.3,      # Default 0.3. Turunkan ke 0.1 atau 0.2 jika teks pudar tidak terdeteksi.
-    det_db_box_thresh=0.5,  # Default 0.6. Batas keyakinan "apakah ini kotak teks?". Turunkan agar kotak yang ragu-ragu tetap diambil.
-    det_db_unclip_ratio=1.6 # Default 1.5. Memperluas area kotak sedikit agar huruf di pinggir tidak terpotong.
-)
-print("Model berhasil dimuat.")
+ocr = PaddleOCR(use_angle_cls=True, lang='id')
 
-@app.get("/")
-def read_root():
-    return {"message": "PaddleOCR API Service is running."}
+def convert_pdf_to_image(file_bytes):
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        page = doc.load_page(0) # Ambil hal 1
+        pix = page.get_pixmap(dpi=200)
+        img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
+        return cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    except:
+        return None
 
 @app.post("/ocr")
 async def process_ocr(file: UploadFile = File(...)):
-    """
-    Endpoint untuk menerima gambar dan mengembalikan hasil OCR.
-    """
     try:
-        print(f"\n--- Menerima file: {file.filename} ---")
         contents = await file.read()
+        img = None
 
-        nparr = np.frombuffer(contents, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if file.filename.lower().endswith('.pdf'):
+            img = convert_pdf_to_image(contents)
+        else:
+            nparr = np.frombuffer(contents, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img is None:
-            print("!!! ERROR: cv2.imdecode gagal memuat gambar.")
-            return {"status": "error", "message": "Gagal membaca file gambar. Pastikan file adalah JPG/PNG."}
+            return {"status": "error", "message": "File tidak terbaca"}
 
-        print("Mulai menjalankan ocr.ocr(img)...")
         result = ocr.ocr(img)
-        print("Proses ocr.ocr(img) selesai.")
 
-        # --- INI ADALAH PERBAIKANNYA ---
         extracted_text = []
+        final_accuracy = "0%"
+
+        # LOGIKA PERBAIKAN INDENTASI DI SINI
         if result and result[0] is not None:
-            # Kita langsung ambil dari kunci 'rec_texts'
-            if 'rec_texts' in result[0]:
+            if 'rec_texts' in result[0] and 'rec_scores' in result[0]:
                 extracted_text = result[0]['rec_texts']
-                print(f"Teks yang diekstrak (BERHASIL): {extracted_text}")
+                confidences = result[0]['rec_scores']
+
+                if confidences:
+                    avg_conf = sum(confidences) / len(confidences)
+                    final_accuracy = f"{round(avg_conf * 100, 2)}%"
             else:
-                print("!!! ERROR: 'rec_texts' key not found in PaddleOCR result.")
+                print("Kunci rec_texts/rec_scores tidak ditemukan.")
         else:
-            print("!!! ERROR: PaddleOCR returned an empty or invalid result.")
-        # --- AKHIR PERBAIKAN ---
+            print("Hasil OCR kosong.")
 
         return {
             "status": "success",
-            "filename": file.filename,
-            "result_text": extracted_text # Ini sekarang akan berisi teks yang benar
+            "result_text": extracted_text,
+            "accuracy": final_accuracy
         }
-
     except Exception as e:
-        print(f"!!! ERROR FATAL DI FUNGSI OCR: {str(e)}")
         return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
-    # Jalankan server API di port 8001
     uvicorn.run(app, host="0.0.0.0", port=8001)
 
 # .\venv\Scripts\activate
