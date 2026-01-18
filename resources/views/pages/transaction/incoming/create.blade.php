@@ -22,6 +22,14 @@
                         </label>
                         <span id="ocr-filename" class="ms-2 text-muted">Belum ada file dipilih</span>
                     </div>
+                    <div class="mt-3">
+                        <label for="ground_truth_input" class="form-label">Teks Asli Surat (Untuk Uji Akurasi - Opsional)</label>
+                        <textarea class="form-control" id="ground_truth_input" rows="3" placeholder="Ketik manual isi surat di sini jika ingin menghitung akurasi..."></textarea>
+                    </div>
+
+                    <div id="accuracy-container" class="mt-2 d-none">
+                        <span class="badge bg-info">Akurasi OCR: <span id="accuracy-value">0%</span></span>
+                    </div>
                     <div class="form-text">Pilih file gambar atau PDF. Formulir akan terisi otomatis.</div>
                 </div>
                 <div class="col-md-4 d-flex align-items-center justify-content-center d-none" id="ocr-loading">
@@ -134,28 +142,36 @@
                 const formData = new FormData();
                 formData.append('file', file);
 
+                // AMBIL TEKS DARI TEXTAREA GROUND TRUTH
+                const groundTruth = document.getElementById('ground_truth_input').value;
+                if (groundTruth) {
+                    formData.append('ground_truth', groundTruth);
+                }
+
                 fetch(OCR_API_URL, {
                     method: 'POST',
                     body: formData,
                 })
-                    .then(response => {
-                        console.log("Menerima respons dari API...");
-                        if (!response.ok) {
-                            return response.json().then(err => {
-                                throw new Error(err.message || 'Server API OCR tidak merespon/error.')
-                            });
-                        }
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
-                        console.log("API Sukses. Memanggil populateForm...");
-                        if (data.status === 'success' && data.result_text) {
-                            ocrStatusText.textContent = 'Memproses teks...';
-                            populateForm(data.result_text); // Kirim array 'result_text'
-                        } else {
-                            throw new Error(data.message || 'Gagal memproses OCR.');
+                        if (data.status === 'success') {
+                            // Ambil akurasi otomatis dari hasil kiriman Python
+                            const autoAccuracy = data.accuracy || "0%";
+
+                            // Tampilkan di UI
+                            const accValue = document.getElementById('accuracy-value');
+                            const accContainer = document.getElementById('accuracy-container');
+
+                            if (accValue && accContainer) {
+                                accValue.textContent = autoAccuracy;
+                                accContainer.classList.remove('d-none');
+                            }
+
+                            // Panggil fungsi isi form dengan membawa nilai akurasi
+                            populateForm(data.result_text, autoAccuracy);
                         }
                     })
+
                     .catch(error => {
                         console.error('Error:', error);
                         ocrStatusText.textContent = 'Gagal: ' + error.message;
@@ -205,7 +221,7 @@
                     }
 
                     // 4. Ekstraksi Pengirim (From)
-                    if (line.includes('BIRO PENGADAAN BARANG DAN JASA') && !dataExtracted.dari) {
+                    if (line.includes('') && !dataExtracted.dari) {
                         dataExtracted.dari = line.trim();
                     }
                 });
@@ -219,8 +235,13 @@
                 if (dataExtracted.dari) document.getElementById('from').value = dataExtracted.dari;
                 if (dataExtracted.perihal) document.getElementById('description').value = dataExtracted.perihal;
 
+                // Kita mengambil teks dari elemen span yang kita buat sebelumnya
+                const accuracyElement = document.getElementById('accuracy-value');
+                const accuracy = accuracyElement ? accuracyElement.textContent : 'N/A';
+
                 Swal.fire({
                     title: 'OCR Berhasil!',
+                    html: `Formulir telah diisi.<br><b>Skor Akurasi: ${accuracy}</b>`,
                     text: 'Formulir telah diisi. Silakan periksa kembali data sebelum menyimpan.',
                     icon: 'success',
                     confirmButtonText: 'Mengerti',
