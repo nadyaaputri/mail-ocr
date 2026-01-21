@@ -71,8 +71,5 @@ async def process_ocr(file: UploadFile = File(...)):
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
 
-<<<<<<< HEAD
-=======
 # .\venv\Scripts\activate
 # uvicorn main:app --host 0.0.0.0 --port 8001 --reload
->>>>>>> 22ee85c88da19bc4f27e2a90bbd57fd8d7e66351
