@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from paddleocr import PaddleOCR
 import numpy as np
 import cv2
-import fitz  # PyMuPDF untuk PDF
+import fitz  # PyMuPDF
+from jiwer import cer
 
 app = FastAPI(title="OCR Service - Auto Accuracy")
 
@@ -27,7 +28,10 @@ def convert_pdf_to_image(file_bytes):
         return None
 
 @app.post("/ocr")
-async def process_ocr(file: UploadFile = File(...)):
+async def process_ocr(
+    file: UploadFile = File(...),
+    ground_truth: str = Form(None)
+):
     try:
         contents = await file.read()
         img = None
@@ -41,28 +45,42 @@ async def process_ocr(file: UploadFile = File(...)):
         if img is None:
             return {"status": "error", "message": "File tidak terbaca"}
 
-        result = ocr.ocr(img)
+        result = ocr.ocr(img, cls=True)
 
-        extracted_text = []
+        extracted_text_list = []
+        confidences = []
+
+        # Parse PaddleOCR result
+        if result and result[0]:
+            for line in result[0]:
+                # line structure: [[box], (text, confidence)]
+                text = line[1][0]
+                score = line[1][1]
+                extracted_text_list.append(text)
+                confidences.append(score)
+
+        full_text_result = " ".join(extracted_text_list)
         final_accuracy = "0%"
 
-        # LOGIKA PERBAIKAN INDENTASI DI SINI
-        if result and result[0] is not None:
-            if 'rec_texts' in result[0] and 'rec_scores' in result[0]:
-                extracted_text = result[0]['rec_texts']
-                confidences = result[0]['rec_scores']
-
-                if confidences:
-                    avg_conf = sum(confidences) / len(confidences)
-                    final_accuracy = f"{round(avg_conf * 100, 2)}%"
-            else:
-                print("Kunci rec_texts/rec_scores tidak ditemukan.")
+        # --- LOGIKA BARU: CER vs CONFIDENCE ---
+        if ground_truth:
+            # JIKA ADA KUNCI JAWABAN -> HITUNG PAKAI RUMUS CER
+            # Rumus Akurasi = (1 - CER) * 100
+            error_rate = cer(ground_truth, full_text_result)
+            accuracy_val = max(0, (1 - error_rate) * 100) # Biar gak minus
+            final_accuracy = f"{round(accuracy_val, 2)}% (Metode CER)"
+            print(f"Mode: Validation (CER). Akurasi: {final_accuracy}")
         else:
-            print("Hasil OCR kosong.")
+            # JIKA TIDAK ADA -> PAKAI RATA-RATA KEYAKINAN AI
+            if confidences:
+                avg_conf = sum(confidences) / len(confidences)
+                final_accuracy = f"{round(avg_conf * 100, 2)}% (Auto Confidence)"
+                print(f"Mode: Automatic. Akurasi: {final_accuracy}")
 
         return {
             "status": "success",
-            "result_text": extracted_text,
+            "filename": file.filename,
+            "result_text": extracted_text_list,
             "accuracy": final_accuracy
         }
     except Exception as e:

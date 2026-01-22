@@ -69,6 +69,9 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/surat-masuk/{letter}/status', [IncomingLetterController::class, 'updateStatus'])->name('transaction.incoming.update_status');
     Route::patch('/surat-keluar/{letter}/status', [OutgoingLetterController::class, 'updateStatus'])->name('transaction.outgoing.update_status');
 
+    // Route untuk halaman pengujian akurasi massal
+    Route::get('/accuracy-test', [App\Http\Controllers\IncomingLetterController::class, 'accuracyTest'])->name('accuracy.test');
+
 });
 
     Route::get('/search', [PageController::class, 'search'])->name('search.global');
@@ -85,8 +88,6 @@ Route::middleware(['auth'])->group(function () {
     // Memproses file yang di-upload
     Route::post('/upload-surat', [OcrController::class, 'processUpload'])->name('surat.upload.process');
 
-    // Route untuk halaman pengujian akurasi massal
-    Route::get('/accuracy-test', [App\Http\Controllers\IncomingLetterController::class, 'accuracyTest'])->name('accuracy.test');
 
 
 
