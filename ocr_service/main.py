@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from paddleocr import PaddleOCR
 import numpy as np
 import cv2
-import fitz  # PyMuPDF untuk PDF
+import fitz  # untuk bisa baca PDF
+#from jiwer import cer
 
 app = FastAPI(title="OCR Service - Auto Accuracy")
 
@@ -46,7 +47,7 @@ async def process_ocr(file: UploadFile = File(...)):
         extracted_text = []
         final_accuracy = "0%"
 
-        # LOGIKA PERBAIKAN INDENTASI DI SINI
+        
         if result and result[0] is not None:
             if 'rec_texts' in result[0] and 'rec_scores' in result[0]:
                 extracted_text = result[0]['rec_texts']

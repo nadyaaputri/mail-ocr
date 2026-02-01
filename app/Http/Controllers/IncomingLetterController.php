@@ -251,4 +251,9 @@ class IncomingLetterController extends Controller
             return back()->with('error', $exception->getMessage());
         }
     }
+
+    public function accuracyTest()
+    {
+        return view('pages.transaction.incoming.accuracy_test');
+    }
 }

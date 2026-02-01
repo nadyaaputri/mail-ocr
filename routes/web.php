@@ -85,6 +85,9 @@ Route::middleware(['auth'])->group(function () {
     // Memproses file yang di-upload
     Route::post('/upload-surat', [OcrController::class, 'processUpload'])->name('surat.upload.process');
 
+    // Route untuk halaman pengujian akurasi massal
+    Route::get('/accuracy-test', [App\Http\Controllers\IncomingLetterController::class, 'accuracyTest'])->name('accuracy.test');
+
 
 
 

@@ -110,6 +110,12 @@
                     <span class="menu-text">{{ __('menu.users') }}</span>
                 </a>
             </li>
+            <li class="menu-item {{ request()->routeIs('accuracy.test') ? 'active' : '' }}">
+                <a href="{{ route('accuracy.test') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
+            <div data-i18n="Uji Akurasi">Uji Akurasi</div>
+         </a>
+        </li>
         @endif
     </ul>
 
