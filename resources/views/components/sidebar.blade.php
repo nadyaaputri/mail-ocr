@@ -112,10 +112,17 @@
             </li>
             <li class="menu-item {{ request()->routeIs('accuracy.test') ? 'active' : '' }}">
                 <a href="{{ route('accuracy.test') }}" class="menu-link">
+<<<<<<< HEAD
                     <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
                     <div data-i18n="Uji Akurasi">Uji Akurasi</div>
                 </a>
             </li>
+=======
+                <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
+            <div data-i18n="Uji Akurasi">Uji Akurasi</div>
+         </a>
+        </li>
+>>>>>>> origin/main
         @endif
     </ul>
 

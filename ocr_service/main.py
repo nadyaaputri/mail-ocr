@@ -4,8 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from paddleocr import PaddleOCR
 import numpy as np
 import cv2
+<<<<<<< HEAD
 import fitz  # PyMuPDF
 from jiwer import cer
+=======
+import fitz  # untuk bisa baca PDF
+#from jiwer import cer
+>>>>>>> origin/main
 
 app = FastAPI(title="OCR Service - Auto Accuracy")
 
@@ -62,6 +67,7 @@ async def process_ocr(
         full_text_result = " ".join(extracted_text_list)
         final_accuracy = "0%"
 
+<<<<<<< HEAD
         # --- LOGIKA BARU: CER vs CONFIDENCE ---
         if ground_truth:
             # JIKA ADA KUNCI JAWABAN -> HITUNG PAKAI RUMUS CER
@@ -70,6 +76,19 @@ async def process_ocr(
             accuracy_val = max(0, (1 - error_rate) * 100) # Biar gak minus
             final_accuracy = f"{round(accuracy_val, 2)}% (Metode CER)"
             print(f"Mode: Validation (CER). Akurasi: {final_accuracy}")
+=======
+        
+        if result and result[0] is not None:
+            if 'rec_texts' in result[0] and 'rec_scores' in result[0]:
+                extracted_text = result[0]['rec_texts']
+                confidences = result[0]['rec_scores']
+
+                if confidences:
+                    avg_conf = sum(confidences) / len(confidences)
+                    final_accuracy = f"{round(avg_conf * 100, 2)}%"
+            else:
+                print("Kunci rec_texts/rec_scores tidak ditemukan.")
+>>>>>>> origin/main
         else:
             # JIKA TIDAK ADA -> PAKAI RATA-RATA KEYAKINAN AI
             if confidences:
