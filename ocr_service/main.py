@@ -1,112 +1,110 @@
+import os
+# Memaksa Paddle untuk tidak menggunakan MKLDNN sama sekali
+os.environ["FLAGS_use_mkldnn"] = "0"
+os.environ["FLAGS_enable_mkldnn"] = "0"
+os.environ["DN_USE_MKLDNN"] = "0"
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from paddleocr import PaddleOCR
 import numpy as np
 import cv2
-<<<<<<< HEAD
-import fitz  # PyMuPDF
-from jiwer import cer
-=======
-import fitz  # untuk bisa baca PDF
-#from jiwer import cer
->>>>>>> origin/main
+from pypdf import PdfReader
+from pdf2image import convert_from_bytes
+import io
+import logging
 
-app = FastAPI(title="OCR Service - Auto Accuracy")
+# Konfigurasi Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Konfigurasi CORS agar Laravel Anda bisa akses
-origins = ["http://localhost:8000", "http://127.0.0.1:8000"]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="SIPERS OCR Service")
 
-# Load model satu kali saat start
-print("Memuat model PaddleOCR...")
-ocr = PaddleOCR(use_angle_cls=True, lang='id')
+# Konfigurasi CORS
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Inisialisasi Model OCR ---
+print("--- MEMUAT MODEL PADDLE OCR (SAFE MODE) ---")
+try:
+    ocr = PaddleOCR(
+        lang='id',            # Bahasa Indonesia
+        use_angle_cls=False,  # FALSE: Matikan rotasi (berat)
+        show_log=True,        # Tampilkan log
+        use_onnx=False,       # FALSE: Engine standar
+        enable_mkldnn=False,  # FALSE: Matikan di parameter
+        use_gpu=False         # FALSE: Pakai CPU
+    )
+    print("--- MODEL BERHASIL DIMUAT! ---")
+except Exception as e:
+    print(f"FATAL ERROR saat load model: {e}")
 
 def convert_pdf_to_image(file_bytes):
+    """Mengubah halaman pertama PDF menjadi gambar numpy array"""
     try:
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        page = doc.load_page(0) # Ambil hal 1
-        pix = page.get_pixmap(dpi=200)
-        img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
-        return cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-    except:
+        images = convert_from_bytes(file_bytes)
+        if images:
+            img = np.array(images[0])
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            return img
+    except Exception as e:
+        logger.warning(f"Gagal convert PDF pakai pdf2image: {e}")
         return None
 
 @app.post("/ocr")
-async def process_ocr(
-    file: UploadFile = File(...),
-    ground_truth: str = Form(None)
-):
+async def ocr_process(file: UploadFile = File(...)):
+    print(f"Menerima file: {file.filename}")
+
     try:
         contents = await file.read()
-        img = None
+        image = None
 
+        # 1. Cek Tipe File
         if file.filename.lower().endswith('.pdf'):
-            img = convert_pdf_to_image(contents)
+            print("Deteksi PDF, converting...")
+            image = convert_from_bytes(contents)[0] # Ambil hal 1
+            image = np.array(image)
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         else:
+            # Gambar Biasa
             nparr = np.frombuffer(contents, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        if img is None:
+        if image is None:
             return {"status": "error", "message": "File tidak terbaca"}
 
-        result = ocr.ocr(img, cls=True)
+        # 2. Lakukan OCR
+        print("Mulai proses OCR (Safe Mode)...")
+        # cls=False penting agar tidak memanggil model rotasi yang sering error
+        result = ocr.ocr(image, cls=False)
 
+        # 3. Ekstrak Teks
         extracted_text_list = []
-        confidences = []
+        full_text = ""
 
-        # Parse PaddleOCR result
         if result and result[0]:
             for line in result[0]:
-                # line structure: [[box], (text, confidence)]
                 text = line[1][0]
-                score = line[1][1]
                 extracted_text_list.append(text)
-                confidences.append(score)
+                full_text += text + " "
 
-        full_text_result = " ".join(extracted_text_list)
-        final_accuracy = "0%"
-
-<<<<<<< HEAD
-        # --- LOGIKA BARU: CER vs CONFIDENCE ---
-        if ground_truth:
-            # JIKA ADA KUNCI JAWABAN -> HITUNG PAKAI RUMUS CER
-            # Rumus Akurasi = (1 - CER) * 100
-            error_rate = cer(ground_truth, full_text_result)
-            accuracy_val = max(0, (1 - error_rate) * 100) # Biar gak minus
-            final_accuracy = f"{round(accuracy_val, 2)}% (Metode CER)"
-            print(f"Mode: Validation (CER). Akurasi: {final_accuracy}")
-=======
-        
-        if result and result[0] is not None:
-            if 'rec_texts' in result[0] and 'rec_scores' in result[0]:
-                extracted_text = result[0]['rec_texts']
-                confidences = result[0]['rec_scores']
-
-                if confidences:
-                    avg_conf = sum(confidences) / len(confidences)
-                    final_accuracy = f"{round(avg_conf * 100, 2)}%"
-            else:
-                print("Kunci rec_texts/rec_scores tidak ditemukan.")
->>>>>>> origin/main
-        else:
-            # JIKA TIDAK ADA -> PAKAI RATA-RATA KEYAKINAN AI
-            if confidences:
-                avg_conf = sum(confidences) / len(confidences)
-                final_accuracy = f"{round(avg_conf * 100, 2)}% (Auto Confidence)"
-                print(f"Mode: Automatic. Akurasi: {final_accuracy}")
+        print("OCR Selesai!")
 
         return {
             "status": "success",
             "filename": file.filename,
             "result_text": extracted_text_list,
-            "accuracy": final_accuracy
+            "full_text": full_text
         }
+
     except Exception as e:
+        print(f"ERROR: {e}")
         return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
-
-# .\venv\Scripts\activate
-# uvicorn main:app --host 0.0.0.0 --port 8001 --reload
