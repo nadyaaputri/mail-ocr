@@ -8,8 +8,8 @@
         <div class="col-md-12 mb-4">
             <div class="card">
                 <div class="card-body text-center">
-                    <h3>🚀 Uji Performa OCR</h3>
-                    <p class="text-muted">Pilih banyak gambar surat sekaligus (misal: 10-15 file) untuk menghitung rata-rata akurasi sistem.</p>
+                    <h3>Uji Performa OCR</h3>
+                    <p class="text-muted">Pilih banyak file surat sekaligus (misal: 10-15 file) untuk menghitung rata-rata akurasi sistem.</p>
 
                     <input type="file" id="batch_files" class="form-control mb-3" multiple accept="image/*,application/pdf">
 
@@ -35,7 +35,7 @@
                                 <th>No</th>
                                 <th>Nama File</th>
                                 <th>Status</th>
-                                <th>Skor Keyakinan (AI)</th>
+                                <th>Confidence Score</th>
                             </tr>
                         </thead>
                         <tbody id="result_body">

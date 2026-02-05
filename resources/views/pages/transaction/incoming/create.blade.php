@@ -37,7 +37,7 @@
 {{--                    </div>--}}
 
                     <div id="accuracy-container" class="mt-2 d-none">
-                        <span class="badge bg-info">Akurasi OCR: <span id="accuracy-value">0%</span></span>
+                        <span class="badge bg-info">Confidence Score OCR: <span id="accuracy-value">0%</span></span>
                     </div>
                     <div class="form-text">Pilih file gambar atau PDF. Formulir akan terisi otomatis.</div>
                 </div>
@@ -194,7 +194,7 @@
 
                     Swal.fire({
                         title: 'Sedang Membaca...',
-                        text: 'AI sedang memindai dokumen, mohon tunggu.',
+                        text: 'Proses OCR Sedang Berlangsung.',
                         allowOutsideClick: false,
                         didOpen: () => Swal.showLoading()
                     });
