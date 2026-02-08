@@ -1,5 +1,4 @@
 import os
-
 # --- KONFIGURASI SYSTEM ---
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["FLAGS_allocator_strategy"] = "naive_best_fit"
@@ -9,12 +8,14 @@ os.environ["FLAGS_use_mkldnn"] = "0"
 
 import logging
 import uvicorn
-from fastapi import FastAPI, UploadFile, File
+# Tambahkan 'Form' di sini untuk menerima input text biasa bersamaan dengan file
+from fastapi import FastAPI, UploadFile, File, Form 
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import cv2
 from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
+import Levenshtein  # <--- WAJIB INSTALL: pip install python-Levenshtein
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +34,7 @@ app.add_middleware(
 ocr_engine = None
 
 print("\n" + "="*50)
-print(" MEMUAT PADDLE OCR (COMPATIBILITY MODE)...")
+print(" MEMUAT PADDLE OCR (COMPATIBILITY MODE + LEVENSHTEIN)...")
 print("="*50 + "\n")
 
 try:
@@ -50,7 +51,10 @@ except Exception as e:
     print(f" ❌ ERROR LOAD MODEL: {e}")
 
 @app.post("/ocr")
-async def ocr_process(file: UploadFile = File(...)):
+async def ocr_process(
+    file: UploadFile = File(...),
+    ground_truth: str = Form(None) # <--- Parameter Baru (Opsional)
+):
     if ocr_engine is None:
         return {"status": "error", "message": "Model Gagal Dimuat."}
 
@@ -62,7 +66,7 @@ async def ocr_process(file: UploadFile = File(...)):
         # 1. Konversi PDF/Gambar
         if file.filename.lower().endswith('.pdf'):
             try:
-                # GANTI PATH POPPLER JIKA PERLU
+                # Path Poppler
                 path_poppler = r"C:\poppler-25.12.0\Library\bin"
                 images = convert_from_bytes(contents, poppler_path=path_poppler)
                 if images:
@@ -80,7 +84,6 @@ async def ocr_process(file: UploadFile = File(...)):
         # 2. Eksekusi OCR
         result = ocr_engine.ocr(image, cls=False)
 
-        # Inisialisasi variabel di luar loop (Wajib!)
         extracted_text_list = []
         confidence_scores = []
 
@@ -93,26 +96,60 @@ async def ocr_process(file: UploadFile = File(...)):
                 extracted_text_list.append(text)
                 confidence_scores.append(score)
 
-        # 4. Hitung Akurasi
-        avg_accuracy = 0.0
-        if len(confidence_scores) > 0:
-            avg_accuracy = sum(confidence_scores) / len(confidence_scores)
-
-        accuracy_string = f"{avg_accuracy * 100:.2f}%"
+        # Gabung hasil jadi satu string panjang
         raw_text_formatted = "\n".join(extracted_text_list)
 
-        print(f"Selesai! Akurasi: {accuracy_string}")
+        # ---------------------------------------------------------
+        # 4. PERHITUNGAN METRIK (Confidence vs CER)
+        # ---------------------------------------------------------
+        
+        # A. Confidence Score (Keyakinan AI)
+        avg_confidence = 0.0
+        if len(confidence_scores) > 0:
+            avg_confidence = sum(confidence_scores) / len(confidence_scores)
+        
+        confidence_string = f"{avg_confidence * 100:.2f}%"
+
+        # B. Real Accuracy via Levenshtein (Validasi Ilmiah)
+        cer_score = 0
+        real_accuracy_string = "N/A" # Default jika tidak ada Ground Truth
+
+        if ground_truth:
+            # Normalisasi: Lowercase & hapus spasi berlebih biar adil
+            # Contoh: "Nomor :  123" dianggap sama dengan "nomor: 123"
+            text_ocr_clean = " ".join(raw_text_formatted.split()).lower()
+            text_gt_clean = " ".join(ground_truth.split()).lower()
+
+            # Hitung Jarak (Berapa huruf yang beda)
+            distance = Levenshtein.distance(text_ocr_clean, text_gt_clean)
+            length = len(text_gt_clean)
+
+            # Hitung CER (Error Rate)
+            if length > 0:
+                cer_score = distance / length
+            else:
+                cer_score = 1.0 # Error total jika GT kosong tapi hasil ada
+            
+            # Hitung Akurasi Asli (100% - Error Rate)
+            real_accuracy_val = max(0, (1 - cer_score) * 100)
+            real_accuracy_string = f"{real_accuracy_val:.2f}%"
+
+        print(f"Selesai! Conf: {confidence_string} | Real Acc: {real_accuracy_string}")
 
         return {
             "status": "success",
             "filename": file.filename,
             "raw_text": raw_text_formatted,
 
-            # --- (Kirim Dua-duanya) ---
-            "lines": extracted_text_list,         # Untuk Script Baru
-            "result_text": extracted_text_list,   # Untuk Script Lama (Create.blade.php)
+            # Compatibility Mode (Kirim Dua-duanya)
+            "lines": extracted_text_list,         
+            "result_text": extracted_text_list,   
 
-            "accuracy": accuracy_string
+            # Data Statistik Lengkap
+            "accuracy": confidence_string,      # Tetap kirim ini agar form surat tidak error
+            "confidence": confidence_string,    # Nama alias yang lebih jelas
+            "cer": f"{cer_score:.4f}",          # Tingkat Error
+            "real_accuracy": real_accuracy_string # Akurasi Sebenarnya
         }
 
     except Exception as e:

@@ -42,3 +42,5 @@ pnpm-debug.log*
 /ocr_service/venv
 /ocr_service/__pycache__
 *.pyc
+
+/FILE KUMPULAN SURAT
