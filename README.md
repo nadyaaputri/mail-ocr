@@ -1,4 +1,4 @@
-#mail-ocr
+# mail-ocr
 git clone https://nadyaaputri/mail-ocr.git
 cd mail
 cp .env.example .env
