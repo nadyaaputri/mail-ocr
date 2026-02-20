@@ -1,4 +1,5 @@
-git clone https://github.com/Przmrn/mail.git
+#mail-ocr
+git clone https://nadyaaputri/mail-ocr.git
 cd mail
 cp .env.example .env
 composer install
